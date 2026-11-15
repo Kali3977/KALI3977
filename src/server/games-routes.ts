@@ -28,6 +28,7 @@ import {
   users,
 } from '../db/schema.ts';
 import { AuthRequest, optionalAuth, requireAuth, requirePermission } from '../middleware/auth.ts';
+import { requireSectionEnabled } from '../middleware/section-guard.ts';
 import { generateSecureCode, sanitizeText } from '../lib/domain/security.ts';
 import { GAME_COSMETICS_CATALOG, type GameEngineType } from '../lib/games/catalog-data.ts';
 import {
@@ -434,6 +435,11 @@ async function buildRoomSnapshot(roomId: number, requestingUserId: number | null
 export function createGamesRouter(): Router {
   const router = Router();
   router.use(express.json({ limit: '256kb' }));
+  const gamesSectionGuard = requireSectionEnabled('games');
+  router.use((req, res, next) => {
+    if (req.path.startsWith('/admin')) return next();
+    return gamesSectionGuard(req as AuthRequest, res, next);
+  });
 
   // =========================================================================
   // 1. CATALOG, GAME DETAILS, ACTIVE ROOMS & PLAYER SUMMARY

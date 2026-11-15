@@ -25,6 +25,8 @@ import { DEFAULT_AI_MENTOR_CONFIG } from '../lib/ai/mentor-limits.ts';
 import { CURRICULUM_COURSES, DIAGNOSTIC_ASSESSMENTS } from './seed-curriculum.ts';
 import { SEEDED_BOOKS, SEEDED_CTF_CHALLENGES } from './seed-ctf-books.ts';
 import { syncGamesArenaSeed } from './seed-games.ts';
+import { syncLearnKaliSeed } from './seed-learn-kali.ts';
+import { ensurePlatformSectionsSeeded } from '../middleware/section-guard.ts';
 
 let seedPromise: Promise<void> | null = null;
 
@@ -496,6 +498,8 @@ async function ensurePlatformSettings(): Promise<void> {
       },
     });
   }
+
+  await ensurePlatformSectionsSeeded();
 }
 
 async function repairSeededData(): Promise<void> {
@@ -510,8 +514,10 @@ async function repairSeededData(): Promise<void> {
   await syncCurriculumAndDiagnostics();
   await syncBooksLibrary();
   await syncCtfChallenges(mainCompId);
+  await syncCyberLabs();
   await ensurePlatformSettings();
   await syncGamesArenaSeed();
+  await syncLearnKaliSeed();
 
   // Ensure tournament brackets aren't fabricated
   const [seededTournament] = await db
@@ -663,88 +669,8 @@ async function runSeed(): Promise<void> {
   // 3. Seed Curriculum & Diagnostics
   await syncCurriculumAndDiagnostics();
 
-  // 4. Seed Cyber Labs (honest microvm_required markers)
-  await db.insert(labs).values([
-    {
-      slug: 'lab-linux-suid-audit',
-      category: 'Linux',
-      title: 'POSIX SUID & Privilege Boundary Audit',
-      description: 'Inspect an isolated Debian container for misconfigured SUID binaries and verify least-privilege remediation.',
-      difficulty: 'Beginner',
-      objectivesJson: [
-        'Enumerate SUID executables inside the isolated microVM',
-        'Identify non-standard binary with elevated file capabilities',
-        'Retrieve the verification token from /root/audit_proof.txt after remediation',
-      ],
-      hintsJson: ['Use find / -perm -4000 2>/dev/null', 'Check getcap -r /usr/bin 2>/dev/null'],
-      timeLimitMinutes: 45,
-      cpuLimitMilli: 500,
-      ramLimitMb: 512,
-      isolationBackend: 'microvm_required',
-      verificationTokenHash: hashFlag('LAB-PROOF-SUID-9941'),
-      xpReward: 150,
-    },
-    {
-      slug: 'lab-network-pcap-triage',
-      category: 'Networking',
-      title: 'DNS Tunneling Packet Capture Triage',
-      description: 'Analyze captured DNS TXT queries to isolate command-and-control exfiltration domains.',
-      difficulty: 'Easy',
-      objectivesJson: ['Filter DNS TXT records by query length', 'Decode base32 subdomain chunks'],
-      hintsJson: ['Inspect queries longer than 48 characters'],
-      timeLimitMinutes: 40,
-      cpuLimitMilli: 500,
-      ramLimitMb: 512,
-      isolationBackend: 'microvm_required',
-      verificationTokenHash: hashFlag('LAB-PROOF-DNS-4410'),
-      xpReward: 180,
-    },
-    {
-      slug: 'lab-web-bola-fix',
-      category: 'Web Security',
-      title: 'API Broken Object Level Authorization Patch',
-      description: 'Diagnose an Express route leaking cross-tenant invoices and enforce server-side ownership checks.',
-      difficulty: 'Medium',
-      objectivesJson: ['Reproduce unauthorized cross-tenant read in sandbox', 'Apply ownership middleware'],
-      hintsJson: ['Compare req.user.id against record.ownerId'],
-      timeLimitMinutes: 60,
-      cpuLimitMilli: 1000,
-      ramLimitMb: 1024,
-      isolationBackend: 'microvm_required',
-      verificationTokenHash: hashFlag('LAB-PROOF-BOLA-7723'),
-      xpReward: 250,
-    },
-    {
-      slug: 'lab-crypto-gcm-nonce',
-      category: 'Cryptography',
-      title: 'AES-GCM Nonce Reuse Recovery Lab',
-      description: 'Demonstrate why AES-GCM IV reuse breaks confidentiality and rotate keys safely in the lab harness.',
-      difficulty: 'Hard',
-      objectivesJson: ['Detect repeated 96-bit nonces in ciphertext corpus', 'Migrate service to random CSPRNG nonces'],
-      hintsJson: ['XOR two ciphertexts encrypted with the same key and nonce'],
-      timeLimitMinutes: 60,
-      cpuLimitMilli: 500,
-      ramLimitMb: 512,
-      isolationBackend: 'microvm_required',
-      verificationTokenHash: hashFlag('LAB-PROOF-GCM-8832'),
-      xpReward: 320,
-    },
-    {
-      slug: 'lab-dfir-memory-forensics',
-      category: 'Digital Forensics',
-      title: 'Volatile Memory Process Injection Analysis',
-      description: 'Examine a memory snapshot inside a restricted forensics microVM to locate hollowed processes.',
-      difficulty: 'Hard',
-      objectivesJson: ['Run pslist vs psscan discrepancy check', 'Extract malicious command line arguments'],
-      hintsJson: ['Compare parent PIDs against standard Windows services.exe hierarchy'],
-      timeLimitMinutes: 75,
-      cpuLimitMilli: 1000,
-      ramLimitMb: 1024,
-      isolationBackend: 'microvm_required',
-      verificationTokenHash: hashFlag('LAB-PROOF-DFIR-3109'),
-      xpReward: 380,
-    },
-  ]);
+  // 4. Seed Cyber Labs (MicroVM + Interactive Non-Runner Walkthrough Labs)
+  await syncCyberLabs();
 
   // 5. Seed Books Library & 55+ CTF Challenges
   await syncBooksLibrary();
@@ -793,4 +719,428 @@ async function runSeed(): Promise<void> {
 
   // 9. Seed Games Arena Categories, 30 Games, Achievements & Missions
   await syncGamesArenaSeed();
+
+  // 10. Seed Learn KALI Levels, Official Tool Categories, Verified Tools, Lessons & Missions
+  await syncLearnKaliSeed();
+}
+
+const CANONICAL_LABS = [
+  {
+    slug: 'lab-interactive-http-header-hardening',
+    category: 'Web Security',
+    title: 'HTTP Security Headers & Session Cookie Audit (Interactive)',
+    description:
+      'Analyze an intercepted production HTTP response trace in your browser, identify missing clickjacking and cookie protections, and complete the remediation check.',
+    difficulty: 'Beginner',
+    objectivesJson: [
+      'Inspect Content-Security-Policy, Strict-Transport-Security, and Set-Cookie flags',
+      'Spot insecure framing and missing HttpOnly/SameSite attributes',
+      'Select the hardened HTTP policy directive to remediate the exposure',
+    ],
+    hintsJson: [
+      'X-Frame-Options is legacy; modern CSP uses frame-ancestors.',
+      'Session cookies storing auth tokens should declare HttpOnly; Secure; SameSite=Lax or Strict.',
+    ],
+    walkthroughJson: [
+      {
+        step: 1,
+        title: 'Capture & Inspect Raw Response Headers',
+        commandExample: 'curl -sI https://app.example.internal/dashboard',
+        instruction: 'Review the returned HTTP status line and header keys before any body payload is rendered.',
+        expectedObservation: 'Observe missing CSP frame-ancestors, missing HSTS, and exposed Server version.',
+      },
+      {
+        step: 2,
+        title: 'Audit Cookie Transport Flags',
+        commandExample: 'grep -i "set-cookie" response_headers.txt',
+        instruction: 'Check whether the session identifier can be read by client-side JavaScript or sent over plaintext HTTP.',
+        expectedObservation: 'Missing HttpOnly allows document.cookie exfiltration during XSS.',
+      },
+      {
+        step: 3,
+        title: 'Validate Hardened Policy',
+        commandExample: "Content-Security-Policy: default-src 'self'; frame-ancestors 'none'",
+        instruction: 'Confirm the directive set that mitigates both clickjacking and unsafe third-party script execution.',
+        expectedObservation: 'Browsers enforce framing block and disallow inline script injection.',
+      },
+    ],
+    assessmentJson: {
+      prompt:
+        'Which response header configuration properly blocks clickjacking AND protects the session cookie from client-side JavaScript theft?',
+      artifactLabel: 'Captured HTTP/1.1 Response Headers',
+      artifactContent: `HTTP/1.1 200 OK
+Date: Sun, 15 Nov 2026 12:15:00 GMT
+Server: nginx/1.24.0
+Set-Cookie: kali_sid=9f81c2b4a0; Path=/
+X-Content-Type-Options: nosniff
+Content-Type: text/html; charset=utf-8`,
+      options: [
+        'Add Access-Control-Allow-Origin: * and keep Set-Cookie unchanged',
+        "Add Content-Security-Policy: frame-ancestors 'none' and append HttpOnly; Secure; SameSite=Strict to Set-Cookie",
+        'Remove X-Content-Type-Options: nosniff and set Server: hidden',
+        'Set Cache-Control: public, max-age=31536000 on Set-Cookie responses',
+      ],
+      correctIndex: 1,
+      explanation:
+        "Content-Security-Policy: frame-ancestors 'none' prevents iframe clickjacking across modern browsers, while HttpOnly; Secure; SameSite=Strict stops JS access and cross-site cookie transmission.",
+    },
+    timeLimitMinutes: 25,
+    cpuLimitMilli: 250,
+    ramLimitMb: 256,
+    storageLimitMb: 256,
+    networkPolicy: 'browser_guided_only',
+    imageRef: 'kali3977/walkthrough-web:1.0',
+    isolationBackend: 'interactive_walkthrough',
+    runnerRequired: false,
+    verificationRequired: true,
+    verificationMode: 'task_assessment',
+    verificationTokenHash: hashFlag('LAB-INTERACTIVE-HTTP-101'),
+    xpReward: 120,
+    enabled: true,
+    published: true,
+  },
+  {
+    slug: 'lab-interactive-auth-log-triage',
+    category: 'Digital Forensics',
+    title: 'SSH Intrusion & Persistence Triage in /var/log/auth.log (Interactive)',
+    description:
+      'Examine an authentic Linux authentication log snippet to distinguish brute-force noise from the successful attacker compromise and post-exploitation user creation.',
+    difficulty: 'Beginner',
+    objectivesJson: [
+      'Separate failed sshd authentication attempts from Accepted publickey/password events',
+      'Identify the exact source IP that gained privileged access',
+      'Spot the suspicious persistence user added immediately after compromise',
+    ],
+    hintsJson: [
+      'Look for "Accepted password" rather than "Failed password" lines.',
+      'Check useradd / usermod lines sharing timestamps right after login.',
+    ],
+    walkthroughJson: [
+      {
+        step: 1,
+        title: 'Filter Failed Brute-Force Attempts',
+        commandExample: 'grep "Failed password" /var/log/auth.log | awk \'{print $(NF-3)}\' | sort | uniq -c',
+        instruction: 'Measure noise volume from scanner IPs to avoid tunnel vision.',
+        expectedObservation: '198.51.100.44 generated multiple failed root attempts.',
+      },
+      {
+        step: 2,
+        title: 'Locate Successful Authentication Event',
+        commandExample: 'grep "Accepted " /var/log/auth.log',
+        instruction: 'Find the IP and account that actually succeeded.',
+        expectedObservation: '203.0.113.77 authenticated successfully as opsadmin.',
+      },
+      {
+        step: 3,
+        title: 'Trace Post-Exploitation Persistence',
+        commandExample: 'grep -E "useradd|usermod|sudo" /var/log/auth.log',
+        instruction: 'Look for privileged account creation seconds after login.',
+        expectedObservation: 'opsadmin invoked sudo useradd svc_backup_adm and added it to sudo group.',
+      },
+    ],
+    assessmentJson: {
+      prompt:
+        'Based on the /var/log/auth.log evidence, which source IP compromised the host and what persistence account did it add?',
+      artifactLabel: '/var/log/auth.log (Excerpt)',
+      artifactContent: `Nov 15 04:11:02 bast01 sshd[4102]: Failed password for root from 198.51.100.44 port 55210 ssh2
+Nov 15 04:11:04 bast01 sshd[4102]: Failed password for root from 198.51.100.44 port 55210 ssh2
+Nov 15 04:12:19 bast01 sshd[4188]: Accepted password for opsadmin from 203.0.113.77 port 49122 ssh2
+Nov 15 04:12:41 bast01 sudo[4205]: opsadmin : TTY=pts/1 ; PWD=/home/opsadmin ; USER=root ; COMMAND=/usr/sbin/useradd -m -s /bin/bash svc_backup_adm
+Nov 15 04:12:46 bast01 sudo[4211]: opsadmin : TTY=pts/1 ; PWD=/home/opsadmin ; USER=root ; COMMAND=/usr/sbin/usermod -aG sudo svc_backup_adm`,
+      options: [
+        '198.51.100.44 compromised root and modified /etc/hosts',
+        '203.0.113.77 brute-forced root and failed login',
+        '203.0.113.77 logged in as opsadmin and added sudo account svc_backup_adm',
+        '198.51.100.44 logged in as svc_backup_adm via public key',
+      ],
+      correctIndex: 2,
+      explanation:
+        '198.51.100.44 only triggered Failed password events. The real breach came from 203.0.113.77 as opsadmin, which immediately escalated via sudo to create sudo-enabled svc_backup_adm.',
+    },
+    timeLimitMinutes: 30,
+    cpuLimitMilli: 250,
+    ramLimitMb: 256,
+    storageLimitMb: 256,
+    networkPolicy: 'browser_guided_only',
+    imageRef: 'kali3977/walkthrough-dfir:1.0',
+    isolationBackend: 'interactive_walkthrough',
+    runnerRequired: false,
+    verificationRequired: true,
+    verificationMode: 'task_assessment',
+    verificationTokenHash: hashFlag('LAB-INTERACTIVE-AUTH-102'),
+    xpReward: 140,
+    enabled: true,
+    published: true,
+  },
+  {
+    slug: 'lab-interactive-linux-permissions-walkthrough',
+    category: 'Linux',
+    title: 'Linux File Permissions, Umask & SUID Walkthrough (Guided)',
+    description:
+      'Master POSIX rwx permission masks, octal mode bits, directory sticky bits, and defensive SUID auditing through a guided step-by-step walkthrough.',
+    difficulty: 'Beginner',
+    objectivesJson: [
+      'Interpret symbolic (rwxr-x---) and octal (0750) permission masks',
+      'Lock down sensitive key files with chmod 0600',
+      'Audit unnecessary SUID bits using find / -perm -4000',
+    ],
+    hintsJson: [
+      'Octal 4 = read, 2 = write, 1 = execute. Owner/Group/Other map to 3 octal digits.',
+    ],
+    walkthroughJson: [
+      {
+        step: 1,
+        title: 'Inspect File Mode Bits',
+        commandExample: 'ls -la /etc/ssh/ssh_host_*_key',
+        instruction: 'Verify that private host keys are readable only by root (0600).',
+        expectedObservation: '-rw------- 1 root root ... confirms zero group/world access.',
+      },
+      {
+        step: 2,
+        title: 'Restrict Over-Permissive Credential File',
+        commandExample: 'chmod 0600 ~/.ssh/id_ed25519 && chmod 0700 ~/.ssh',
+        instruction: 'OpenSSH refuses private keys accessible by group or others.',
+        expectedObservation: 'Permissions tighten to owner read/write only.',
+      },
+      {
+        step: 3,
+        title: 'Audit Setuid Binaries',
+        commandExample: 'find /usr/bin -perm -4000 -ls 2>/dev/null',
+        instruction: 'Review executables bearing the 4000 (s) special bit that run with owner EUID.',
+        expectedObservation: 'Only expected system helpers like sudo/passwd should appear.',
+      },
+    ],
+    assessmentJson: null,
+    timeLimitMinutes: 20,
+    cpuLimitMilli: 250,
+    ramLimitMb: 256,
+    storageLimitMb: 256,
+    networkPolicy: 'browser_guided_only',
+    imageRef: 'kali3977/walkthrough-linux:1.0',
+    isolationBackend: 'interactive_walkthrough',
+    runnerRequired: false,
+    verificationRequired: false,
+    verificationMode: 'none',
+    verificationTokenHash: hashFlag('LAB-WALKTHROUGH-POSIX-103'),
+    xpReward: 100,
+    enabled: true,
+    published: true,
+  },
+  {
+    slug: 'lab-linux-suid-audit',
+    category: 'Linux',
+    title: 'POSIX SUID & Privilege Boundary Audit',
+    description:
+      'Inspect an isolated Debian container for misconfigured SUID binaries and verify least-privilege remediation.',
+    difficulty: 'Beginner',
+    objectivesJson: [
+      'Enumerate SUID executables inside the isolated microVM',
+      'Identify non-standard binary with elevated file capabilities',
+      'Retrieve the verification token from /root/audit_proof.txt after remediation',
+    ],
+    hintsJson: ['Use find / -perm -4000 2>/dev/null', 'Check getcap -r /usr/bin 2>/dev/null'],
+    walkthroughJson: [
+      {
+        step: 1,
+        title: 'Locate SUID Executables',
+        commandExample: 'find / -perm -4000 -type f 2>/dev/null',
+        instruction: 'Scan filesystem inside the MicroVM for non-standard root-owned SUID binaries.',
+        expectedObservation: 'Identify helper executable outside standard OS baseline.',
+      },
+      {
+        step: 2,
+        title: 'Inspect File Capabilities',
+        commandExample: 'getcap -r /usr/bin 2>/dev/null',
+        instruction: 'Verify Linux capabilities such as cap_setuid or cap_dac_read_search.',
+        expectedObservation: 'Confirm capability mismatch enabling privilege boundary bypass.',
+      },
+    ],
+    assessmentJson: null,
+    timeLimitMinutes: 45,
+    cpuLimitMilli: 500,
+    ramLimitMb: 512,
+    storageLimitMb: 1024,
+    networkPolicy: 'isolated_no_egress',
+    imageRef: 'kali3977/lab-linux-suid:1.0',
+    isolationBackend: 'microvm_required',
+    runnerRequired: true,
+    verificationRequired: true,
+    verificationMode: 'runner_proof',
+    verificationTokenHash: hashFlag('LAB-PROOF-SUID-9941'),
+    xpReward: 150,
+    enabled: true,
+    published: true,
+  },
+  {
+    slug: 'lab-network-pcap-triage',
+    category: 'Networking',
+    title: 'DNS Tunneling Packet Capture Triage',
+    description: 'Analyze captured DNS TXT queries to isolate command-and-control exfiltration domains.',
+    difficulty: 'Easy',
+    objectivesJson: ['Filter DNS TXT records by query length', 'Decode base32 subdomain chunks'],
+    hintsJson: ['Inspect queries longer than 48 characters'],
+    walkthroughJson: [
+      {
+        step: 1,
+        title: 'Filter TXT Queries with tshark',
+        commandExample: 'tshark -r capture.pcapng -Y "dns.qry.type == 16" -T fields -e dns.qry.name',
+        instruction: 'Extract abnormal DNS TXT hostnames.',
+        expectedObservation: 'High-entropy subdomain labels exceeding 48 bytes point to tunneling.',
+      },
+    ],
+    assessmentJson: null,
+    timeLimitMinutes: 40,
+    cpuLimitMilli: 500,
+    ramLimitMb: 512,
+    storageLimitMb: 1024,
+    networkPolicy: 'isolated_no_egress',
+    imageRef: 'kali3977/lab-net-pcap:1.0',
+    isolationBackend: 'microvm_required',
+    runnerRequired: true,
+    verificationRequired: true,
+    verificationMode: 'runner_proof',
+    verificationTokenHash: hashFlag('LAB-PROOF-DNS-4410'),
+    xpReward: 180,
+    enabled: true,
+    published: true,
+  },
+  {
+    slug: 'lab-web-bola-fix',
+    category: 'Web Security',
+    title: 'API Broken Object Level Authorization Patch',
+    description: 'Diagnose an Express route leaking cross-tenant invoices and enforce server-side ownership checks.',
+    difficulty: 'Medium',
+    objectivesJson: ['Reproduce unauthorized cross-tenant read in sandbox', 'Apply ownership middleware'],
+    hintsJson: ['Compare req.user.id against record.ownerId'],
+    walkthroughJson: [
+      {
+        step: 1,
+        title: 'Reproduce Cross-Tenant IDOR',
+        commandExample: 'curl -H "Authorization: Bearer $TOKEN" http://127.0.0.1:4000/api/invoices/1002',
+        instruction: 'Check whether a different tenant ID returns another user’s invoice.',
+        expectedObservation: '200 OK leaks cross-tenant invoice without ownerId verification.',
+      },
+    ],
+    assessmentJson: null,
+    timeLimitMinutes: 60,
+    cpuLimitMilli: 1000,
+    ramLimitMb: 1024,
+    storageLimitMb: 2048,
+    networkPolicy: 'isolated_no_egress',
+    imageRef: 'kali3977/lab-web-bola:1.0',
+    isolationBackend: 'microvm_required',
+    runnerRequired: true,
+    verificationRequired: true,
+    verificationMode: 'runner_proof',
+    verificationTokenHash: hashFlag('LAB-PROOF-BOLA-7723'),
+    xpReward: 250,
+    enabled: true,
+    published: true,
+  },
+  {
+    slug: 'lab-crypto-gcm-nonce',
+    category: 'Cryptography',
+    title: 'AES-GCM Nonce Reuse Recovery Lab',
+    description: 'Demonstrate why AES-GCM IV reuse breaks confidentiality and rotate keys safely in the lab harness.',
+    difficulty: 'Hard',
+    objectivesJson: ['Detect repeated 96-bit nonces in ciphertext corpus', 'Migrate service to random CSPRNG nonces'],
+    hintsJson: ['XOR two ciphertexts encrypted with the same key and nonce'],
+    walkthroughJson: [
+      {
+        step: 1,
+        title: 'Detect Duplicate Nonces',
+        commandExample: 'python3 audit_nonces.py corpus.jsonl',
+        instruction: 'Scan 12-byte IV values across captured AES-GCM messages.',
+        expectedObservation: 'Repeated 96-bit IV enables keystream XOR recovery.',
+      },
+    ],
+    assessmentJson: null,
+    timeLimitMinutes: 60,
+    cpuLimitMilli: 500,
+    ramLimitMb: 512,
+    storageLimitMb: 1024,
+    networkPolicy: 'isolated_no_egress',
+    imageRef: 'kali3977/lab-crypto-gcm:1.0',
+    isolationBackend: 'microvm_required',
+    runnerRequired: true,
+    verificationRequired: true,
+    verificationMode: 'runner_proof',
+    verificationTokenHash: hashFlag('LAB-PROOF-GCM-8832'),
+    xpReward: 320,
+    enabled: true,
+    published: true,
+  },
+  {
+    slug: 'lab-dfir-memory-forensics',
+    category: 'Digital Forensics',
+    title: 'Volatile Memory Process Injection Analysis',
+    description: 'Examine a memory snapshot inside a restricted forensics microVM to locate hollowed processes.',
+    difficulty: 'Hard',
+    objectivesJson: ['Run pslist vs psscan discrepancy check', 'Extract malicious command line arguments'],
+    hintsJson: ['Compare parent PIDs against standard Windows services.exe hierarchy'],
+    walkthroughJson: [
+      {
+        step: 1,
+        title: 'Run Volatility Process Discrepancy Scan',
+        commandExample: 'vol -f memdump.raw windows.pslist && vol -f memdump.raw windows.malfind',
+        instruction: 'Detect unlinked processes or RWX private memory regions.',
+        expectedObservation: 'Suspicious injected process lacks valid parent hierarchy.',
+      },
+    ],
+    assessmentJson: null,
+    timeLimitMinutes: 75,
+    cpuLimitMilli: 1000,
+    ramLimitMb: 1024,
+    storageLimitMb: 4096,
+    networkPolicy: 'isolated_no_egress',
+    imageRef: 'kali3977/lab-dfir-mem:1.0',
+    isolationBackend: 'microvm_required',
+    runnerRequired: true,
+    verificationRequired: true,
+    verificationMode: 'runner_proof',
+    verificationTokenHash: hashFlag('LAB-PROOF-DFIR-3109'),
+    xpReward: 380,
+    enabled: true,
+    published: true,
+  },
+];
+
+export async function syncCyberLabs(): Promise<void> {
+  for (const item of CANONICAL_LABS) {
+    const [existing] = await db.select().from(labs).where(eq(labs.slug, item.slug)).limit(1);
+    if (!existing) {
+      await db.insert(labs).values(item);
+    } else if (!existing.walkthroughJson || existing.walkthroughJson.length === 0) {
+      await db
+        .update(labs)
+        .set({
+          walkthroughJson: item.walkthroughJson,
+          assessmentJson: existing.assessmentJson ?? item.assessmentJson,
+          runnerRequired: item.runnerRequired,
+          verificationMode: existing.verificationMode || item.verificationMode,
+          storageLimitMb: item.storageLimitMb,
+          networkPolicy: item.networkPolicy,
+          imageRef: item.imageRef,
+        })
+        .where(eq(labs.id, existing.id));
+    }
+  }
+
+  const [labAch] = await db
+    .select()
+    .from(achievements)
+    .where(eq(achievements.code, 'LAB_PRACTITIONER'))
+    .limit(1);
+  if (!labAch) {
+    await db
+      .insert(achievements)
+      .values({
+        code: 'LAB_PRACTITIONER',
+        title: 'Hands-On Lab Practitioner',
+        description: 'Completed your first verified cybersecurity lab in KALI3977.',
+        category: 'Labs',
+        xpBonus: 100,
+      })
+      .onConflictDoNothing();
+  }
 }

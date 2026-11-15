@@ -30,6 +30,7 @@ export const VALID_NAV_SECTIONS: readonly NavSection[] = [
   'academy',
   'books',
   'labs',
+  'learn-kali',
   'ctf',
   'arena',
   'games',

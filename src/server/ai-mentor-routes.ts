@@ -31,6 +31,10 @@ import {
   type AuthRequest,
   type DbUser,
 } from '../middleware/auth.ts';
+import {
+  requireSectionEnabled,
+  syncSectionFromLegacyToggle,
+} from '../middleware/section-guard.ts';
 import { askAiCyberMentor, type MentorRequest, type MentorResponse } from './ai-mentor.ts';
 
 export interface ReservedMentorSession {
@@ -938,6 +942,7 @@ export interface AiMentorRouterDeps {
   askMentor?: (input: MentorRequest) => Promise<MentorResponse>;
   authMiddleware?: (req: AuthRequest, res: import('express').Response, next: import('express').NextFunction) => unknown;
   optionalAuthMiddleware?: (req: AuthRequest, res: import('express').Response, next: import('express').NextFunction) => unknown;
+  sectionGuardMiddleware?: (req: AuthRequest, res: import('express').Response, next: import('express').NextFunction) => unknown;
 }
 
 function isAuthorizedAiAdmin(user?: DbUser): boolean {
@@ -951,9 +956,10 @@ export function createAiMentorRouter(deps: AiMentorRouterDeps = {}) {
   const askMentor = deps.askMentor ?? askAiCyberMentor;
   const authMw = deps.authMiddleware ?? requireAuth;
   const optAuthMw = deps.optionalAuthMiddleware ?? optionalAuth;
+  const mentorSectionGuard = deps.sectionGuardMiddleware ?? (deps.store ? (_req, _res, next) => next() : requireSectionEnabled('mentor'));
 
   // Public/User status endpoint (returns limits, reset timestamps, and user's remaining quota if logged in)
-  router.get('/ai/mentor/status', optAuthMw, async (req: AuthRequest, res) => {
+  router.get('/ai/mentor/status', optAuthMw, mentorSectionGuard, async (req: AuthRequest, res) => {
     try {
       const status = await store.getStatus(req.dbUser?.id ?? null);
       res.json(status);
@@ -964,7 +970,7 @@ export function createAiMentorRouter(deps: AiMentorRouterDeps = {}) {
   });
 
   // Main authenticated AI Cyber Mentor endpoint with atomic per-user & budget enforcement
-  router.post('/ai/mentor', authMw, async (req: AuthRequest, res) => {
+  router.post('/ai/mentor', authMw, mentorSectionGuard, async (req: AuthRequest, res) => {
     const u = req.dbUser!;
     if (u.isBanned || u.isSuspended) {
       return res.status(403).json({ error: 'Account is suspended or banned.' });
@@ -1087,6 +1093,18 @@ export function createAiMentorRouter(deps: AiMentorRouterDeps = {}) {
       patch: check.patch,
       ipAddress: req.ip,
     });
+    if (!deps.store && typeof check.patch.enabled === 'boolean') {
+      try {
+        await syncSectionFromLegacyToggle({
+          sectionKey: 'mentor',
+          enabled: config.enabled,
+          actorId: actor.id,
+          actorEmail: actor.email,
+        });
+      } catch (err) {
+        console.error('Failed to sync mentor section state:', err);
+      }
+    }
     res.json({ config });
   });
 

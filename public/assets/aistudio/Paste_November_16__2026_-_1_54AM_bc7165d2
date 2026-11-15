@@ -1,0 +1,943 @@
+# KALI3977 — COMPLETE PLATFORM MASTER IMPLEMENTATION
+
+## 1. PROJECT IDENTITY AND VISION
+
+Project name: KALI3977
+
+Kali3977 is a comprehensive, completely free cybersecurity learning, practical training, competition and community platform.
+
+It must serve:
+- Absolute beginners with no programming or cybersecurity experience.
+- School and university students.
+- First-year through final-year cybersecurity students.
+- Intermediate and advanced learners.
+- Professional penetration testers and security researchers.
+- Experienced practitioners seeking specialist and research-level knowledge.
+
+The platform must continuously expand. Do not restrict the curriculum to a short beginner course or a fixed collection of topics.
+
+IMPORTANT:
+- Continue working on the existing Kali3977 project.
+- Do not create a new application.
+- Do not unnecessarily replace the existing architecture.
+- Preserve existing features, accounts, records, progress and data.
+- Do not rebuild unrelated working components.
+
+## 2. PERMANENT FREE PLATFORM POLICY
+
+Kali3977 must remain 100% free for every user. This is a permanent platform policy.
+
+Completely prohibit:
+- Paid memberships.
+- Premium accounts.
+- Paid courses.
+- Paid Cyber Labs.
+- Paid tools or learning materials.
+- Subscription plans.
+- Payment gateways.
+- Checkout systems.
+- Wallets and purchases.
+- Payment-based feature restrictions.
+- Premium-only badges or achievements.
+- Advertisements or alternative monetization mechanisms.
+
+All educational content, courses, tools, labs, games, competitions and learning resources must be accessible without payment.
+
+Reasonable technical fair-use limits, security restrictions and infrastructure quotas are permitted, but they must never become payment requirements.
+
+Audit the entire application for existing payment restrictions and remove them safely.
+
+Preserve all user data, achievements, progress and historical records.
+
+## 3. EXISTING TECHNICAL ARCHITECTURE
+
+Inspect and reuse the actual existing architecture.
+
+The latest technical audit identified:
+
+- Frontend: React, TypeScript and Vite.
+- Backend: Node.js and Express.
+- Database: PostgreSQL.
+- ORM: Drizzle ORM.
+- Authentication: Firebase Authentication.
+- Server-side Firebase ID token verification: firebase-admin.
+- Hosting: Google Cloud Run.
+- Database hosting: Google Cloud SQL.
+- Existing API structure under /api.
+- Existing role-based permissions.
+- Existing audit logging system.
+
+Firestore is not currently the connected primary database. Do not introduce it as a replacement for PostgreSQL.
+
+Reuse existing:
+- Authentication.
+- Database connections.
+- API conventions.
+- Authorization middleware.
+- Navigation.
+- Design system.
+- User profiles.
+- XP and achievements.
+- Audit logs.
+- Competition infrastructure.
+
+Never expose server secrets, database credentials, API keys or privileged operations to frontend code.
+
+## 4. GLOBAL SECTION MANAGEMENT — OWNER/ADMIN
+
+Create a dedicated Section Management panel inside the existing Admin / Owner Control Centre.
+
+It must be separate from the existing Platform Controls panel.
+
+Preserve all existing Platform Controls:
+
+- Worldwide Registration Open.
+- Maintenance Mode Banner.
+- Disable AI Cyber Mentor.
+- Disable Community Hub.
+- Require MFA for Owner & Admins.
+- AI Cyber Mentor Daily Quota.
+- Lab Max Duration.
+- Global Platform Announcement.
+
+Do not remove or unnecessarily duplicate these existing controls.
+
+### Sections requiring individual Enable/Disable controls
+
+1. Learning Academy
+2. Books
+3. Cyber Labs
+4. Learn KALI
+5. CTF Arena
+6. Multiplayer Arena
+7. Games Arena
+8. Tournaments & Events
+9. AI Cyber Mentor
+10. Community
+11. Career Hub
+
+### Enable/Disable behaviour
+
+When enabled:
+- Section appears in navigation.
+- Regular users can access it.
+- Authorized APIs work normally.
+
+When disabled:
+- Hide the section from regular users.
+- Hide dashboard shortcuts and recommendations.
+- Block direct URL access.
+- Block relevant backend API access.
+- Show an appropriate unavailable message.
+- Preserve all data and student progress.
+
+Authorized administrators must still be able to manage disabled sections.
+
+### Additional controls
+
+- Enable All.
+- Disable All with confirmation.
+- Individual section switches.
+- Status: Enabled, Disabled, Coming Soon, Maintenance.
+- Optional status message.
+- Last updated by and timestamp.
+- Change history.
+- Preview as Student.
+
+Home, Profile, Notifications, Settings, Legal and Admin must not be accidentally disabled.
+
+Preview as Student must be a UI preview only. It must not grant or remove actual server permissions.
+
+### Technical implementation
+
+Create a persistent PostgreSQL-backed section registry.
+
+Use a canonical section registry and safe migrations.
+
+Implement:
+- GET /api/sections
+- GET /api/admin/sections
+- POST /api/admin/sections/:key
+- POST /api/admin/sections/bulk
+
+Use server-side middleware such as requireSectionEnabled(sectionKey).
+
+Apply authorization to direct routes and APIs, not just navigation visibility.
+
+Use the existing audit log system to record administrative changes.
+
+Preserve legacy AI Mentor and Community settings safely and prevent conflicting duplicate controls.
+
+Only authorized owners or administrators with explicit section-management permissions can change settings.
+
+## 5. LEARNING ACADEMY — COMPLETE CYBERSECURITY CURRICULUM
+
+Build a continuously expandable cybersecurity learning ecosystem.
+
+Learning paths:
+- Absolute Beginner.
+- Beginner.
+- Intermediate.
+- Advanced.
+- Expert.
+- Specialist.
+- Research Level.
+
+### Foundations
+- Computer fundamentals.
+- Operating systems.
+- Linux and Windows.
+- Programming.
+- Python, C, C++, JavaScript and Bash.
+- Data structures and algorithms.
+- Computer networks.
+- TCP/IP, DNS, HTTP and HTTPS.
+- Databases.
+- Cryptography.
+- Computer architecture.
+
+### Core cybersecurity
+- Security principles.
+- Network security.
+- Web security.
+- Application security.
+- Cloud security.
+- System security.
+- Identity and access management.
+- Authentication and authorization.
+- Vulnerability management.
+- Threat intelligence.
+- Security operations.
+- Incident response.
+- Digital forensics.
+- Malware analysis.
+- Reverse engineering.
+- Penetration testing.
+- Secure software development.
+
+### Advanced and specialist areas
+- Advanced exploitation.
+- Binary exploitation.
+- Reverse engineering.
+- Advanced cryptography.
+- Hardware security.
+- IoT security.
+- Mobile security.
+- Wireless security.
+- Cloud-native security.
+- Container security.
+- Active Directory security.
+- Red team operations.
+- Blue team operations.
+- Threat hunting.
+- Security research.
+- Advanced vulnerability discovery.
+- AI security.
+- Machine learning security.
+- Blockchain security.
+- Privacy engineering.
+- Advanced digital forensics.
+
+Include research papers, case studies, professional workflows, advanced projects and specialist learning paths.
+
+Every course must contain:
+- Detailed explanations.
+- Prerequisites.
+- Learning objectives.
+- Step-by-step lessons.
+- Examples.
+- Diagrams where useful.
+- Code examples.
+- Practical exercises.
+- Labs.
+- Assessments.
+- Projects.
+- Further reading.
+- References and sources.
+- Next recommended learning steps.
+
+Do not artificially limit content depth.
+
+Use progressive learning so beginners are not overwhelmed while advanced learners can access deeper material.
+
+## 6. NEW MAJOR SECTION — LEARN KALI
+
+Official display name: **Learn KALI**
+
+Section key: `learn-kali`
+
+This is the correct name. Do not call it Kali Linux Academy.
+
+### Navigation placement — CRITICAL
+
+Place Learn KALI immediately below Cyber Labs in the main navigation.
+
+Required navigation order:
+
+1. Cyber Labs
+2. Learn KALI
+3. CTF Arena
+
+Do not place Learn KALI under Learning Academy, Books, or inside Cyber Labs.
+
+It must be a separate major platform section with its own navigation entry, routes, content structure and admin controls.
+
+### Core vision
+
+Learn KALI teaches students how to use Kali Linux from absolute zero to advanced professional level.
+
+It must not look or behave like an ordinary online course.
+
+Design it as an interactive cybersecurity learning game in which students:
+- Progress through levels.
+- Unlock tools and categories.
+- Complete missions.
+- Earn XP.
+- Develop tool mastery.
+- Solve cybersecurity scenarios.
+- Unlock advanced challenges.
+- Build practical skills.
+
+The interface should feel like a futuristic cybersecurity training environment while remaining easy to use.
+
+### A. Progressive game levels
+
+Level 1 — Linux Rookie
+- Linux fundamentals.
+- Kali Linux introduction.
+- Installation.
+- Desktop environment.
+- Filesystem.
+- Basic terminal commands.
+
+Level 2 — Terminal Explorer
+- File management.
+- Permissions.
+- Users and groups.
+- Processes.
+- Services.
+- Package management.
+- Bash fundamentals.
+
+Level 3 — Network Hunter
+- Networking fundamentals.
+- IP addresses.
+- Ports.
+- DNS.
+- Nmap.
+- Wireshark.
+- Netcat.
+
+Level 4 — Recon Specialist
+- Information gathering.
+- OSINT.
+- Enumeration.
+- Reconnaissance workflows.
+
+Level 5 — Web Security Agent
+- Web application fundamentals.
+- Burp Suite.
+- OWASP ZAP.
+- SQLmap.
+- Directory discovery.
+- Web vulnerability assessment.
+
+Level 6 — Penetration Tester
+- Vulnerability analysis.
+- Metasploit.
+- Controlled exploitation.
+- Security testing methodologies.
+
+Level 7 — Digital Forensics Expert
+- File-system investigation.
+- Disk forensics.
+- Memory forensics.
+- Autopsy.
+- Volatility.
+
+Level 8 — Elite Security Operator
+- Advanced Linux security.
+- Privilege escalation in authorized environments.
+- Reverse engineering.
+- Automation.
+- Python and Bash scripting.
+- Advanced scenarios.
+- Capstone projects.
+
+These levels are initial progression stages, not a limit on future content.
+
+### B. Complete Kali Linux tool library
+
+Create a comprehensive, expandable catalog covering the full Kali Linux tool collection.
+
+Do not restrict the catalog to a few popular tools.
+
+Organize tools according to official Kali categories, including:
+
+- Information Gathering.
+- Vulnerability Analysis.
+- Web Application Analysis.
+- Database Assessment.
+- Password Attacks.
+- Wireless Attacks.
+- Reverse Engineering.
+- Exploitation Tools.
+- Sniffing and Spoofing.
+- Digital Forensics.
+- Reporting Tools.
+- Social Engineering Tools.
+- Hardware Security.
+- System Services.
+- Other official Kali tool categories.
+
+Examples:
+Nmap, Wireshark, Metasploit Framework, Burp Suite, OWASP ZAP, SQLmap, Gobuster, Nikto, John the Ripper, Hashcat, Aircrack-ng, Kismet, Autopsy, Volatility, Ghidra, Radare2, Bettercap, Netcat and other relevant tools.
+
+These examples are not the complete catalog.
+
+Use official Kali Linux tool documentation and verified upstream repositories as sources.
+
+For every tool, maintain:
+- Name.
+- Category.
+- Description.
+- Purpose.
+- Installation instructions.
+- Supported operating systems.
+- Version information where available.
+- Basic commands.
+- Intermediate commands.
+- Advanced usage.
+- Command option explanations.
+- Practical examples.
+- Related tools.
+- Official documentation.
+- Verified GitHub repository, if available.
+- Prerequisites.
+- Common errors.
+- Troubleshooting.
+- Relevant exercises and missions.
+- Deprecation or availability status.
+
+Do not invent tools, repository links, commands or capabilities.
+
+Maintain the catalog so newly added, updated and deprecated Kali tools can be reflected over time.
+
+### C. Individual tool learning pages
+
+Every tool must have its own dedicated interactive learning page.
+
+For example, the Nmap page should teach:
+- What Nmap is.
+- Why it is used.
+- How to install it.
+- How to configure it.
+- Basic scanning.
+- Service detection.
+- Version detection.
+- Advanced scanning techniques.
+- Command options.
+- Reading scan results.
+- Common errors.
+- Practical exercises.
+- Authorized lab challenges.
+
+Explain commands instead of merely displaying them.
+
+Students must understand what every command does and why it is being used.
+
+### D. Game mechanics
+
+Implement:
+- XP points.
+- Levels.
+- Tool mastery scores.
+- Unlockable categories.
+- Interactive skill trees.
+- Missions.
+- Quests.
+- Daily challenges.
+- Achievement badges.
+- Learning streaks.
+- Boss missions.
+- Hidden challenges.
+- Leaderboards.
+- Personal progress map.
+- Final capstone missions.
+
+Progression must depend on actual learning and performance, not simply clicking Next.
+
+Integrate with the existing Kali3977 XP and achievement system.
+
+Prevent duplicate XP rewards and score manipulation.
+
+### E. Interactive educational terminal
+
+Create a browser-based educational terminal.
+
+Students should be able to:
+- Learn Linux commands.
+- Execute supported simulated exercises.
+- See command output.
+- Understand errors.
+- Modify commands.
+- Retry exercises.
+- Complete guided challenges.
+
+Clearly distinguish simulated execution from execution inside a real Kali Linux environment.
+
+Never execute arbitrary student commands on the main application server.
+
+Real command execution must only occur in a properly isolated environment.
+
+### F. Practical missions
+
+Create realistic scenarios:
+- Network investigations.
+- Web application security assessments.
+- Password auditing.
+- Digital forensic investigations.
+- Wireless security scenarios.
+- Vulnerability discovery.
+- Linux privilege management.
+- Incident investigations.
+- Security configuration challenges.
+- Multi-stage capstone investigations.
+
+Use synthetic targets, intentionally vulnerable environments or explicitly authorized targets.
+
+### G. Learn KALI administration
+
+The Owner must be able to:
+- Enable or Disable Learn KALI.
+- Enable or Disable individual tool categories.
+- Add, edit and remove tools.
+- Add and edit lessons.
+- Update documentation and GitHub links.
+- Create and edit missions.
+- Publish or unpublish content.
+- Configure XP and achievements.
+- Manage difficulty and prerequisites.
+- Monitor student progress.
+- Manage learning paths.
+
+When Learn KALI is disabled, regular users must not be able to access it through direct URLs or protected APIs.
+
+Administrators must retain management access.
+
+## 7. CYBER LABS — FREE ACCESS AND OPTIONAL VERIFICATION
+
+Cyber Labs must be free for every student.
+
+Remove:
+- Paid lab restrictions.
+- Premium lab labels.
+- Payment verification.
+- Subscription checks.
+- Purchase requirements.
+- Payment-based access controls.
+
+### Lab verification configuration
+
+Add an individual setting for every lab:
+
+Completion Verification Required: YES / NO
+
+When NO:
+- Students can access and practise without a verification token.
+- No static lab verification token is required to open the lab.
+- Completion follows the configured learning and assessment rules.
+- Do not automatically award completion merely because the student opened the lab.
+
+When YES:
+- Use appropriate completion verification.
+- CTF labs can use flag submission.
+- Isolated execution labs can use runner-confirmed completion.
+- Other labs can use suitable task-based assessments.
+
+Verification must never be confused with payment.
+
+### Lab access without MicroVM infrastructure
+
+Allow educational content, walkthroughs, simulated terminal exercises and suitable practice labs to work without an external MicroVM runner.
+
+Only require isolated execution for labs that genuinely need it.
+
+If the external runner is unavailable:
+- Show a clear message.
+- Do not falsely claim a lab is running.
+- Keep non-runner-dependent learning content accessible.
+- Do not unnecessarily block every lab.
+
+### Critical XP and verification security fixes
+
+Audit the existing lab verification implementation.
+
+The previous audit identified that the existing /verify endpoint may permit completion without an active runner session and repeated XP farming.
+
+Fix these vulnerabilities:
+- Verify session ownership.
+- Verify appropriate completion conditions.
+- Prevent proof replay.
+- Award XP only once per eligible completion.
+- Use transactional database operations.
+- Preserve existing completed records.
+- Backfill historical XP award state safely.
+- Prevent repeated completion submissions from increasing XP.
+- Never trust frontend-only completion status.
+
+Do not deploy or claim an external runner is operational until it is actually connected and tested.
+
+## 8. FUTURE EXTERNAL LAB INFRASTRUCTURE
+
+The current Cloud Run application is not a Firecracker MicroVM host.
+
+Do not attempt to run Firecracker directly inside the existing Cloud Run service.
+
+Design the application so an external isolated runner can be connected later.
+
+Possible future infrastructure:
+- Dedicated Google Compute Engine workers.
+- Nested KVM where supported.
+- Firecracker MicroVMs.
+- Separate isolated lab network.
+- Server-to-server authenticated runner API.
+- Short-lived terminal access tokens.
+- Session expiration and cleanup.
+- Resource quotas.
+- Network restrictions.
+
+Keep runner credentials server-side.
+
+Do not expose runner secrets or infrastructure credentials to students.
+
+Do not provision expensive infrastructure automatically.
+
+First produce a cost and security plan. Require explicit Owner approval before provisioning paid cloud resources.
+
+## 9. EXISTING CTF, COMPETITION AND GAME SYSTEMS
+
+Preserve and improve existing systems rather than replacing them.
+
+Maintain:
+- CTF Arena.
+- Multiplayer Arena.
+- Games Arena.
+- Tournaments and Events.
+- Team management.
+- Leaderboards.
+- Competition history.
+- Achievements.
+- Existing room and team code logic.
+
+### Room Code and Team Code must remain separate
+
+Room Code:
+- Identifies the competition room.
+
+Team Code:
+- Identifies the player's campus or team affiliation.
+
+Do not merge these two codes.
+
+Authorized administrators must be able to manage:
+- Room codes.
+- Team codes.
+- Competition permissions.
+- Competition rules.
+- Team access.
+- Room settings.
+- Participant access.
+
+Preserve the existing permission architecture.
+
+### Competition integrity
+
+- Validate scoring server-side.
+- Prevent duplicate submissions.
+- Prevent unauthorized score changes.
+- Validate competition access.
+- Record administrative actions.
+- Preserve competition history.
+
+## 10. CENTRAL ADMIN AND OWNER MANAGEMENT
+
+Create a centralized administrative experience.
+
+Include:
+- Section Management.
+- Platform Controls.
+- Learn KALI Management.
+- Learning Academy Management.
+- Course and lesson management.
+- Tool catalog management.
+- Mission management.
+- Cyber Lab management.
+- Lab completion settings.
+- XP and achievement configuration.
+- Competition management.
+- User and role management.
+- Global announcements.
+- Audit history.
+- Security and abuse monitoring.
+
+All privileged actions must be authorized server-side.
+
+Do not give moderators or ordinary administrators unrestricted Owner permissions.
+
+Use explicit permission checks for sensitive controls.
+
+## 11. PLATFORM SECURITY
+
+Implement and audit:
+- Server-side authorization.
+- Secure authentication.
+- Role-based access control.
+- Secure API validation.
+- Rate limiting.
+- Abuse monitoring.
+- Bot and automated abuse detection where appropriate.
+- CTF anti-cheating measures.
+- Server-side scoring.
+- Anti-replay protections.
+- Audit logging.
+- Input validation.
+- Secure session handling.
+- Secret management.
+- Protection against common web vulnerabilities.
+- Appropriate access controls.
+- Protection against unauthorized data scraping.
+- Safe file uploads.
+- Database access restrictions.
+- Security monitoring.
+
+Keep privileged scoring, validation, team management and administrative operations on the server.
+
+### Safety and authorization
+
+All offensive-security practice must use:
+- Synthetic targets.
+- Intentionally vulnerable environments.
+- Locally controlled systems.
+- Explicitly authorized testing environments.
+
+Do not enable arbitrary attacks against public or unauthorized targets.
+
+## 12. CONTENT SOURCES AND ATTRIBUTION
+
+- Preserve Kali3977 branding and original platform content.
+- Maintain attribution and licenses for third-party resources.
+- Do not copy copyrighted course material without permission.
+- Track the source and version of imported documentation.
+- Use properly licensed repositories and educational resources.
+- Clearly identify third-party tools and projects.
+- Verify GitHub links and official documentation links before publishing.
+
+## 13. USER EXPERIENCE AND DESIGN
+
+Use a consistent, modern, responsive cybersecurity interface.
+
+The overall design should feel:
+- Futuristic.
+- Professional.
+- Interactive.
+- Easy to navigate.
+- Suitable for beginners and experts.
+- Consistent across desktop and mobile.
+
+Learn KALI can have its own game-inspired interface, but it must remain visually integrated with Kali3977.
+
+Avoid:
+- Unnecessary visual clutter.
+- Broken navigation.
+- Fake progress.
+- Fake tool execution.
+- Nonfunctional buttons.
+- Repeated placeholder lessons.
+- Invented documentation links.
+
+Make the learning experience intuitive enough for a complete beginner to start without assistance.
+
+## 14. DATABASE AND DATA PRESERVATION
+
+Before changing the database:
+- Inspect the existing schema.
+- Identify existing tables and relationships.
+- Identify duplicate or conflicting settings.
+- Plan safe migrations.
+
+Preserve:
+- Accounts.
+- User profiles.
+- XP.
+- Achievements.
+- Course progress.
+- Lab history.
+- Competition records.
+- Team memberships.
+- Audit logs.
+
+Do not drop or recreate existing production tables unnecessarily.
+
+Use migrations and safe backfills.
+
+### Learn KALI data model
+
+Create or extend appropriate tables for:
+- Tool catalog.
+- Tool categories.
+- Tool versions and sources.
+- Courses.
+- Learning paths.
+- Modules.
+- Lessons.
+- Prerequisites.
+- Missions.
+- Challenges.
+- Student progress.
+- Tool mastery.
+- XP rewards.
+- Achievements.
+
+Use the existing database conventions and avoid duplicate systems where existing tables can be safely reused.
+
+## 15. IMPLEMENTATION STRATEGY
+
+Do not attempt a risky full-platform rewrite.
+
+Implement in controlled phases.
+
+### PHASE 0 — COMPLETE AUDIT
+
+- Inspect the entire existing project.
+- Identify current features and architecture.
+- Audit payment restrictions.
+- Audit section controls.
+- Audit Cyber Labs and XP verification.
+- Identify existing reusable components.
+- Inspect navigation and route definitions.
+- Inspect existing XP and achievements.
+- Produce a technical implementation plan.
+
+### PHASE 1 — FREE PLATFORM AND SECTION MANAGEMENT
+
+- Remove payment-based restrictions.
+- Implement persistent Section Management.
+- Add Learn KALI with section key learn-kali.
+- Place Learn KALI immediately below Cyber Labs.
+- Integrate frontend and backend access controls.
+- Preserve existing Platform Controls.
+
+### PHASE 2 — CYBER LAB IMPROVEMENTS
+
+- Remove payment requirements.
+- Add optional completion verification.
+- Fix XP farming and verification vulnerabilities.
+- Support non-runner-dependent labs.
+- Preserve existing lab history.
+
+### PHASE 3 — LEARN KALI FOUNDATION
+
+- Create Learn KALI interface.
+- Implement curriculum structure.
+- Create complete expandable tool catalog.
+- Add individual tool pages.
+- Add learning progression.
+- Add administration for content and tools.
+
+### PHASE 4 — GAME EXPERIENCE
+
+- Add XP and mastery.
+- Add skill trees.
+- Add missions and quests.
+- Add achievements.
+- Add daily challenges.
+- Add leaderboards.
+- Add boss missions and capstones.
+
+### PHASE 5 — INTERACTIVE PRACTICE
+
+- Add simulated terminal.
+- Add guided exercises.
+- Add command validation.
+- Add practical assessments.
+- Connect existing Cyber Labs where appropriate.
+
+### PHASE 6 — FUTURE ISOLATED EXECUTION
+
+- Design and validate external lab infrastructure.
+- Estimate actual cloud costs.
+- Obtain explicit Owner approval.
+- Connect runner APIs.
+- Test isolation and security before production use.
+
+### PHASE 7 — TESTING AND QUALITY
+
+Test using:
+- Student account.
+- Team captain account.
+- Moderator account.
+- Event admin account.
+- Owner account.
+
+Test:
+- All section switches.
+- Correct navigation order.
+- Direct URL restrictions.
+- Backend API authorization.
+- Free access to all content.
+- Lab completion and XP integrity.
+- Learn KALI progress.
+- Tool catalog.
+- Missions and achievements.
+- Mobile and desktop layouts.
+- Existing competitions.
+- Room and team code logic.
+- Data preservation.
+
+Fix regressions before deployment.
+
+## 16. FINAL NON-NEGOTIABLE REQUIREMENTS
+
+Kali3977 must remain:
+- Completely free.
+- Continuously expandable.
+- Beginner-friendly.
+- Advanced enough for professionals.
+- Secure.
+- Practical.
+- Game-oriented where appropriate.
+- Fully integrated with the existing application.
+
+Learn KALI must:
+- Always be named Learn KALI.
+- Have section key learn-kali.
+- Be directly below Cyber Labs.
+- Remain separate from Cyber Labs.
+- Teach the full Kali Linux tool ecosystem.
+- Include game-based progression and practical learning.
+- Be manageable through Section Management.
+
+Do not mark a feature complete unless it actually works.
+
+Do not use placeholder functionality and describe it as production-ready.
+
+Do not claim that all Kali tools can execute in a browser merely because they appear in the catalog.
+
+Do not provision external paid infrastructure without explicit approval.
+
+At the end of each phase, report:
+1. What was implemented.
+2. Files changed.
+3. Database migrations.
+4. API endpoints added or changed.
+5. Security changes.
+6. Tests performed and results.
+7. Known limitations.
+8. Next phase.
+
+START BY AUDITING THE EXISTING KALI3977 PROJECT.
+
+Then implement the phases sequentially, preserving all existing working features and data.
+
+Do not stop at a design mockup or a list of proposed features. Build functional features in manageable phases.

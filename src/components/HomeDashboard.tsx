@@ -13,6 +13,7 @@ import {
   Users,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useSections } from '../context/SectionContext';
 import type { Campus, NavSection } from '../types/kali';
 import { AdminSecurityNotice } from './AdminSecurityNotice';
 import heroBannerImg from '../assets/images/hero_cyber_arena_1794688362854.jpg';
@@ -83,6 +84,7 @@ export const HomeDashboard: React.FC<{ onNavigate: (section: NavSection) => void
   onNavigate,
 }) => {
   const { user, memberships, authPending, loginWithGoogle, apiFetch } = useAuth();
+  const { isSectionVisibleInNav } = useSections();
   const [data, setData] = useState<OverviewPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -168,7 +170,7 @@ export const HomeDashboard: React.FC<{ onNavigate: (section: NavSection) => void
                 {authPending ? 'Signing in...' : 'Sign In with Google'}
                 <ArrowRight className="h-4 w-4" />
               </button>
-            ) : (
+            ) : isSectionVisibleInNav('arena') ? (
               <button
                 type="button"
                 onClick={() => onNavigate('arena')}
@@ -177,28 +179,43 @@ export const HomeDashboard: React.FC<{ onNavigate: (section: NavSection) => void
                 Enter Multiplayer Arena
                 <ArrowRight className="h-4 w-4" />
               </button>
+            ) : null}
+            {isSectionVisibleInNav('learn-kali') && (
+              <button
+                type="button"
+                onClick={() => onNavigate('learn-kali')}
+                className="rounded-lg border border-cyan-500/50 bg-cyan-500/15 px-4 py-2.5 text-sm font-medium text-cyan-300 hover:bg-cyan-500/25 transition-colors whitespace-nowrap shrink-0"
+              >
+                Learn KALI
+              </button>
             )}
-            <button
-              type="button"
-              onClick={() => onNavigate('games')}
-              className="rounded-lg border border-emerald-500/50 bg-emerald-500/15 px-4 py-2.5 text-sm font-medium text-emerald-300 hover:bg-emerald-500/25 transition-colors whitespace-nowrap shrink-0"
-            >
-              Games Arena (30 Games)
-            </button>
-            <button
-              type="button"
-              onClick={() => onNavigate('academy')}
-              className="rounded-lg border border-slate-600 bg-black/40 px-4 py-2.5 text-sm font-medium text-white hover:bg-white/10 transition-colors whitespace-nowrap shrink-0"
-            >
-              Explore Academy
-            </button>
-            <button
-              type="button"
-              onClick={() => onNavigate('books')}
-              className="rounded-lg border border-slate-600 bg-black/40 px-4 py-2.5 text-sm font-medium text-white hover:bg-white/10 transition-colors whitespace-nowrap shrink-0"
-            >
-              Browse Books
-            </button>
+            {isSectionVisibleInNav('games') && (
+              <button
+                type="button"
+                onClick={() => onNavigate('games')}
+                className="rounded-lg border border-emerald-500/50 bg-emerald-500/15 px-4 py-2.5 text-sm font-medium text-emerald-300 hover:bg-emerald-500/25 transition-colors whitespace-nowrap shrink-0"
+              >
+                Games Arena (30 Games)
+              </button>
+            )}
+            {isSectionVisibleInNav('academy') && (
+              <button
+                type="button"
+                onClick={() => onNavigate('academy')}
+                className="rounded-lg border border-slate-600 bg-black/40 px-4 py-2.5 text-sm font-medium text-white hover:bg-white/10 transition-colors whitespace-nowrap shrink-0"
+              >
+                Explore Academy
+              </button>
+            )}
+            {isSectionVisibleInNav('books') && (
+              <button
+                type="button"
+                onClick={() => onNavigate('books')}
+                className="rounded-lg border border-slate-600 bg-black/40 px-4 py-2.5 text-sm font-medium text-white hover:bg-white/10 transition-colors whitespace-nowrap shrink-0"
+              >
+                Browse Books
+              </button>
+            )}
           </div>
         </div>
       </section>
@@ -213,20 +230,22 @@ export const HomeDashboard: React.FC<{ onNavigate: (section: NavSection) => void
       <section aria-label="Platform Statistics">
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-7">
           {[
-            { label: 'Registered Learners', value: data?.platformStats.totalUsers ?? 0, icon: Users },
-            { label: 'Academy Courses', value: data?.platformStats.totalCourses ?? 0, icon: BookOpen },
-            { label: 'Library Books', value: data?.platformStats.totalBooks ?? 0, icon: Library },
-            { label: 'Isolated Labs', value: data?.platformStats.totalLabs ?? 0, icon: FlaskConical },
-            { label: 'CTF Challenges', value: data?.platformStats.totalChallenges ?? 0, icon: Flag },
-            { label: 'Verified Campuses', value: data?.platformStats.totalCampuses ?? 0, icon: Award },
-            { label: 'Competitions', value: data?.platformStats.totalCompetitions ?? 0, icon: Trophy },
-          ].map((stat) => {
-            const Icon = stat.icon;
-            return (
-              <div
-                key={stat.label}
-                className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-4"
-              >
+            { label: 'Registered Learners', value: data?.platformStats.totalUsers ?? 0, icon: Users, visible: true },
+            { label: 'Academy Courses', value: data?.platformStats.totalCourses ?? 0, icon: BookOpen, visible: isSectionVisibleInNav('academy') },
+            { label: 'Library Books', value: data?.platformStats.totalBooks ?? 0, icon: Library, visible: isSectionVisibleInNav('books') },
+            { label: 'Isolated Labs', value: data?.platformStats.totalLabs ?? 0, icon: FlaskConical, visible: isSectionVisibleInNav('labs') },
+            { label: 'CTF Challenges', value: data?.platformStats.totalChallenges ?? 0, icon: Flag, visible: isSectionVisibleInNav('ctf') },
+            { label: 'Verified Campuses', value: data?.platformStats.totalCampuses ?? 0, icon: Award, visible: true },
+            { label: 'Competitions', value: data?.platformStats.totalCompetitions ?? 0, icon: Trophy, visible: isSectionVisibleInNav('arena') },
+          ]
+            .filter((s) => s.visible)
+            .map((stat) => {
+              const Icon = stat.icon;
+              return (
+                <div
+                  key={stat.label}
+                  className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-4"
+                >
                 <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
                   <span className="text-xs font-medium">{stat.label}</span>
                   <Icon className="h-4 w-4 text-cyan-500" />
@@ -372,13 +391,15 @@ export const HomeDashboard: React.FC<{ onNavigate: (section: NavSection) => void
                     Recommended Challenges
                   </h3>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => onNavigate('ctf')}
-                  className="text-xs font-medium text-emerald-600 dark:text-emerald-400 hover:underline"
-                >
-                  Open CTF Arena
-                </button>
+                {isSectionVisibleInNav('ctf') && (
+                  <button
+                    type="button"
+                    onClick={() => onNavigate('ctf')}
+                    className="text-xs font-medium text-emerald-600 dark:text-emerald-400 hover:underline"
+                  >
+                    Open CTF Arena
+                  </button>
+                )}
               </div>
               <div className="divide-y divide-slate-200 dark:divide-slate-800">
                 {data.playerDashboard.recommendedChallenges.map((ch) => (
@@ -407,13 +428,15 @@ export const HomeDashboard: React.FC<{ onNavigate: (section: NavSection) => void
             <h2 className="font-display text-lg font-semibold text-slate-900 dark:text-slate-100">
               Participating University Campuses ({data.campuses.length})
             </h2>
-            <button
-              type="button"
-              onClick={() => onNavigate('arena')}
-              className="text-xs font-medium text-emerald-500 hover:underline"
-            >
-              Join Campus Squad
-            </button>
+            {isSectionVisibleInNav('arena') && (
+              <button
+                type="button"
+                onClick={() => onNavigate('arena')}
+                className="text-xs font-medium text-emerald-500 hover:underline"
+              >
+                Join Campus Squad
+              </button>
+            )}
           </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
             {data.campuses.map((c) => (
@@ -441,13 +464,15 @@ export const HomeDashboard: React.FC<{ onNavigate: (section: NavSection) => void
               Active & Upcoming Competitions
             </h2>
           </div>
-          <button
-            type="button"
-            onClick={() => onNavigate('arena')}
-            className="text-sm font-medium text-cyan-600 dark:text-cyan-400 hover:underline"
-          >
-            Join with Room & Team Code
-          </button>
+          {isSectionVisibleInNav('arena') && (
+            <button
+              type="button"
+              onClick={() => onNavigate('arena')}
+              className="text-sm font-medium text-cyan-600 dark:text-cyan-400 hover:underline"
+            >
+              Join with Room & Team Code
+            </button>
+          )}
         </div>
 
         <div className="divide-y divide-slate-200 dark:divide-slate-800">
@@ -461,13 +486,15 @@ export const HomeDashboard: React.FC<{ onNavigate: (section: NavSection) => void
                   <span className="text-emerald-600 dark:text-emerald-400 font-medium">{ev.status}</span>
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => onNavigate('arena')}
-                className="rounded-lg border border-slate-200 dark:border-slate-700 px-3.5 py-1.5 text-xs font-medium hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors whitespace-nowrap shrink-0"
-              >
-                View Room
-              </button>
+              {isSectionVisibleInNav('arena') && (
+                <button
+                  type="button"
+                  onClick={() => onNavigate('arena')}
+                  className="rounded-lg border border-slate-200 dark:border-slate-700 px-3.5 py-1.5 text-xs font-medium hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors whitespace-nowrap shrink-0"
+                >
+                  View Room
+                </button>
+              )}
             </div>
           ))}
         </div>

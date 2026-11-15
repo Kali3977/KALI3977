@@ -332,12 +332,39 @@ export const labs = pgTable('labs', {
   difficulty: text('difficulty').notNull(),
   objectivesJson: jsonb('objectives_json').$type<string[]>().notNull().default([]),
   hintsJson: jsonb('hints_json').$type<string[]>().notNull().default([]),
+  walkthroughJson: jsonb('walkthrough_json')
+    .$type<
+      Array<{
+        step: number;
+        title: string;
+        commandExample: string;
+        instruction: string;
+        expectedObservation: string;
+      }>
+    >()
+    .notNull()
+    .default([]),
+  assessmentJson: jsonb('assessment_json').$type<{
+    prompt: string;
+    artifactLabel: string;
+    artifactContent: string;
+    options: string[];
+    correctIndex: number;
+    explanation: string;
+  } | null>(),
   timeLimitMinutes: integer('time_limit_minutes').notNull().default(45),
   cpuLimitMilli: integer('cpu_limit_milli').notNull().default(500),
   ramLimitMb: integer('ram_limit_mb').notNull().default(512),
+  storageLimitMb: integer('storage_limit_mb').notNull().default(1024),
+  networkPolicy: text('network_policy').notNull().default('isolated_no_egress'),
+  imageRef: text('image_ref').notNull().default('kali3977/sandbox-base:1.0'),
   isolationBackend: text('isolation_backend').notNull().default('microvm_required'),
+  runnerRequired: boolean('runner_required').notNull().default(false),
+  verificationRequired: boolean('verification_required').notNull().default(true),
+  verificationMode: text('verification_mode').notNull().default('proof_token'),
   verificationTokenHash: text('verification_token_hash').notNull(),
   xpReward: integer('xp_reward').notNull().default(150),
+  enabled: boolean('enabled').notNull().default(true),
   published: boolean('published').notNull().default(true),
 });
 
@@ -345,6 +372,7 @@ export const labSessions = pgTable(
   'lab_sessions',
   {
     id: serial('id').primaryKey(),
+    sessionUuid: text('session_uuid').notNull().default(''),
     labId: integer('lab_id')
       .notNull()
       .references(() => labs.id, { onDelete: 'cascade' }),
@@ -352,11 +380,21 @@ export const labSessions = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     status: text('status').notNull().default('provision_required'),
+    verified: boolean('verified').notNull().default(false),
+    xpAwarded: boolean('xp_awarded').notNull().default(false),
+    xpAwardedAt: timestamp('xp_awarded_at'),
+    runnerInstanceId: text('runner_instance_id'),
+    failureReason: text('failure_reason'),
     startedAt: timestamp('started_at').notNull().defaultNow(),
+    expiresAt: timestamp('expires_at'),
     completedAt: timestamp('completed_at'),
+    terminatedAt: timestamp('terminated_at'),
     resetCount: integer('reset_count').notNull().default(0),
   },
-  (table) => [index('lab_sessions_user_idx').on(table.userId)],
+  (table) => [
+    index('lab_sessions_user_idx').on(table.userId),
+    index('lab_sessions_user_lab_idx').on(table.userId, table.labId),
+  ],
 );
 
 export const ctfChallenges = pgTable(
@@ -1291,5 +1329,212 @@ export const gameAdminLogs = pgTable(
     createdAt: timestamp('created_at').notNull().defaultNow(),
   },
   (table) => [index('game_admin_logs_created_idx').on(table.createdAt)],
+);
+
+// =========================================================================
+// GLOBAL SECTION MANAGEMENT (Persistent Feature/Section Lifecycle Controls)
+// =========================================================================
+export const platformSections = pgTable('platform_sections', {
+  id: serial('id').primaryKey(),
+  sectionKey: text('section_key').notNull().unique(),
+  sectionName: text('section_name').notNull(),
+  description: text('description').notNull().default(''),
+  category: text('category').notNull().default('Core'),
+  isLockable: boolean('is_lockable').notNull().default(true),
+  enabledStatus: boolean('enabled_status').notNull().default(true),
+  displayStatus: text('display_status').notNull().default('enabled'), // 'enabled' | 'disabled' | 'coming_soon' | 'maintenance'
+  maintenanceStatus: boolean('maintenance_status').notNull().default(false),
+  statusMessage: text('status_message').notNull().default(''),
+  sortOrder: integer('sort_order').notNull().default(0),
+  updatedById: integer('updated_by_id').references(() => users.id, { onDelete: 'set null' }),
+  updatedByEmail: text('updated_by_email'),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// =========================================================================
+// LEARN KALI (Gamified Tool Ecosystem, Skill Tree, Simulator & Missions)
+// =========================================================================
+export interface KaliCommandExample {
+  command: string;
+  explanation: string;
+  flagBreakdown: Array<{ flag: string; meaning: string }>;
+  sampleOutput?: string;
+}
+
+export interface KaliCommonErrorItem {
+  error: string;
+  cause: string;
+  fix: string;
+}
+
+export const kaliLevels = pgTable('kali_levels', {
+  id: serial('id').primaryKey(),
+  levelNumber: integer('level_number').notNull().unique(),
+  slug: text('slug').notNull().unique(),
+  title: text('title').notNull(),
+  subtitle: text('subtitle').notNull().default(''),
+  description: text('description').notNull(),
+  xpRequired: integer('xp_required').notNull().default(0),
+  badgeTitle: text('badge_title').notNull().default(''),
+  topicsJson: jsonb('topics_json').$type<string[]>().notNull().default([]),
+  sortOrder: integer('sort_order').notNull().default(1),
+  published: boolean('published').notNull().default(true),
+});
+
+export const kaliCategories = pgTable('kali_categories', {
+  id: serial('id').primaryKey(),
+  slug: text('slug').notNull().unique(),
+  name: text('name').notNull(),
+  description: text('description').notNull(),
+  officialOrder: integer('official_order').notNull().default(1),
+  iconKey: text('icon_key').notNull().default('terminal'),
+  enabled: boolean('enabled').notNull().default(true),
+  published: boolean('published').notNull().default(true),
+});
+
+export const kaliTools = pgTable(
+  'kali_tools',
+  {
+    id: serial('id').primaryKey(),
+    slug: text('slug').notNull().unique(),
+    categoryId: integer('category_id')
+      .notNull()
+      .references(() => kaliCategories.id, { onDelete: 'cascade' }),
+    categorySlug: text('category_slug').notNull(),
+    name: text('name').notNull(),
+    summary: text('summary').notNull(),
+    purpose: text('purpose').notNull(),
+    installCommand: text('install_command').notNull(),
+    supportedOs: text('supported_os').notNull().default('Kali Linux / Debian / Ubuntu'),
+    versionNote: text('version_note').notNull().default('Kali Rolling Package'),
+    difficulty: text('difficulty').notNull().default('Beginner'),
+    minLevelNumber: integer('min_level_number').notNull().default(1),
+    xpReward: integer('xp_reward').notNull().default(80),
+    status: text('status').notNull().default('active'), // 'active' | 'deprecated' | 'optional'
+    prerequisitesJson: jsonb('prerequisites_json').$type<string[]>().notNull().default([]),
+    basicCommandsJson: jsonb('basic_commands_json').$type<KaliCommandExample[]>().notNull().default([]),
+    intermediateCommandsJson: jsonb('intermediate_commands_json')
+      .$type<KaliCommandExample[]>()
+      .notNull()
+      .default([]),
+    advancedCommandsJson: jsonb('advanced_commands_json')
+      .$type<KaliCommandExample[]>()
+      .notNull()
+      .default([]),
+    commonErrorsJson: jsonb('common_errors_json').$type<KaliCommonErrorItem[]>().notNull().default([]),
+    relatedToolSlugsJson: jsonb('related_tool_slugs_json').$type<string[]>().notNull().default([]),
+    officialDocsUrl: text('official_docs_url').notNull(),
+    githubUrl: text('github_url'),
+    interactiveSupported: boolean('interactive_supported').notNull().default(true),
+    enabled: boolean('enabled').notNull().default(true),
+    published: boolean('published').notNull().default(true),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (table) => [
+    index('kali_tools_cat_idx').on(table.categoryId),
+    index('kali_tools_level_idx').on(table.minLevelNumber),
+  ],
+);
+
+export const kaliToolLessons = pgTable(
+  'kali_tool_lessons',
+  {
+    id: serial('id').primaryKey(),
+    toolId: integer('tool_id')
+      .notNull()
+      .references(() => kaliTools.id, { onDelete: 'cascade' }),
+    slug: text('slug').notNull().unique(),
+    title: text('title').notNull(),
+    stepOrder: integer('step_order').notNull().default(1),
+    contentMarkdown: text('content_markdown').notNull(),
+    commandPractice: text('command_practice').notNull().default(''),
+    expectedGoal: text('expected_goal').notNull().default(''),
+    quizQuestion: text('quiz_question').notNull(),
+    quizOptionsJson: jsonb('quiz_options_json').$type<string[]>().notNull().default([]),
+    quizCorrectIndex: integer('quiz_correct_index').notNull().default(0),
+    quizExplanation: text('quiz_explanation').notNull().default(''),
+    xpReward: integer('xp_reward').notNull().default(60),
+    published: boolean('published').notNull().default(true),
+  },
+  (table) => [index('kali_tool_lessons_tool_idx').on(table.toolId)],
+);
+
+export const kaliMissions = pgTable('kali_missions', {
+  id: serial('id').primaryKey(),
+  slug: text('slug').notNull().unique(),
+  title: text('title').notNull(),
+  missionType: text('mission_type').notNull().default('mission'), // 'mission' | 'quest' | 'daily' | 'boss' | 'capstone' | 'hidden'
+  categorySlug: text('category_slug').notNull(),
+  levelNumber: integer('level_number').notNull().default(1),
+  difficulty: text('difficulty').notNull().default('Beginner'),
+  description: text('description').notNull(),
+  scenarioBrief: text('scenario_brief').notNull(),
+  objectivesJson: jsonb('objectives_json').$type<string[]>().notNull().default([]),
+  requiredToolSlugsJson: jsonb('required_tool_slugs_json').$type<string[]>().notNull().default([]),
+  terminalChallengeJson: jsonb('terminal_challenge_json').$type<{
+    startingDir: string;
+    simulatedPrompt: string;
+    steps: Array<{
+      id: string;
+      instruction: string;
+      expectedPattern: string;
+      hint: string;
+      explanation: string;
+    }>;
+  } | null>(),
+  assessmentJson: jsonb('assessment_json').$type<{
+    question: string;
+    options: string[];
+    correctIndex: number;
+    explanation: string;
+  } | null>(),
+  relatedLabSlug: text('related_lab_slug'),
+  xpReward: integer('xp_reward').notNull().default(180),
+  achievementCode: text('achievement_code'),
+  enabled: boolean('enabled').notNull().default(true),
+  published: boolean('published').notNull().default(true),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+export const kaliUserToolProgress = pgTable(
+  'kali_user_tool_progress',
+  {
+    id: serial('id').primaryKey(),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    toolId: integer('tool_id')
+      .notNull()
+      .references(() => kaliTools.id, { onDelete: 'cascade' }),
+    masteryScore: integer('mastery_score').notNull().default(0),
+    lessonsCompletedJson: jsonb('lessons_completed_json').$type<number[]>().notNull().default([]),
+    terminalExercisesPassedJson: jsonb('terminal_exercises_passed_json')
+      .$type<string[]>()
+      .notNull()
+      .default([]),
+    xpAwardedTotal: integer('xp_awarded_total').notNull().default(0),
+    lastPracticedAt: timestamp('last_practiced_at').notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex('kali_user_tool_unique_idx').on(table.userId, table.toolId)],
+);
+
+export const kaliUserMissionProgress = pgTable(
+  'kali_user_mission_progress',
+  {
+    id: serial('id').primaryKey(),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    missionId: integer('mission_id')
+      .notNull()
+      .references(() => kaliMissions.id, { onDelete: 'cascade' }),
+    status: text('status').notNull().default('in_progress'), // 'in_progress' | 'completed'
+    stepsPassedJson: jsonb('steps_passed_json').$type<string[]>().notNull().default([]),
+    xpAwarded: boolean('xp_awarded').notNull().default(false),
+    completedAt: timestamp('completed_at'),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex('kali_user_mission_unique_idx').on(table.userId, table.missionId)],
 );
 

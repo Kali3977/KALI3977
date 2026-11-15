@@ -82,7 +82,7 @@ export const BooksLibrary: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
-  const [availability, setAvailability] = useState<'all' | 'free' | 'paid'>('all');
+  const [availability, setAvailability] = useState<'all' | 'free' | 'external_ref'>('all');
   const [viewMode, setViewMode] = useState<'all' | 'reading_list' | 'bookmarked'>('all');
   const [readerBook, setReaderBook] = useState<BookItem | null>(null);
   const [chapterIndex, setChapterIndex] = useState(0);
@@ -114,7 +114,7 @@ export const BooksLibrary: React.FC = () => {
     return books.filter((b) => {
       if (category !== 'All' && b.category !== category) return false;
       if (availability === 'free' && !b.isFree) return false;
-      if (availability === 'paid' && b.isFree) return false;
+      if (availability === 'external_ref' && b.isFree) return false;
       if (viewMode === 'reading_list' && !b.progress?.inReadingList) return false;
       if (viewMode === 'bookmarked' && !b.progress?.bookmarked) return false;
       if (!q) return true;
@@ -197,7 +197,7 @@ export const BooksLibrary: React.FC = () => {
             Books & Knowledge Library
           </h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            Open-access textbooks, GNU & official vendor manuals, and curated publisher references across 21 technical domains.
+            100% free platform access to open-access textbooks, GNU & official vendor manuals, and curated publisher references across 21 technical domains.
           </p>
         </div>
 
@@ -252,21 +252,21 @@ export const BooksLibrary: React.FC = () => {
         </div>
         <div className="md:col-span-3">
           <select
-            aria-label="Filter books by availability"
+            aria-label="Filter books by license"
             value={availability}
             onChange={(e) => setAvailability(e.target.value as typeof availability)}
             className="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0A0D12] px-3 py-1.5 text-xs"
           >
-            <option value="all">Availability: All</option>
-            <option value="free">Free / Open Access Only</option>
-            <option value="paid">Paid / Publisher Editions</option>
+            <option value="all">Access: All Titles</option>
+            <option value="free">Open Access &amp; Readable Online</option>
+            <option value="external_ref">Copyrighted Publisher References</option>
           </select>
         </div>
       </div>
 
       {/* Licensing Integrity Banner */}
       <div className="rounded-xl border border-cyan-500/30 bg-cyan-500/5 px-4 py-3 text-xs text-slate-600 dark:text-slate-300">
-        Copyright & Licensing Policy: Open-access, public-domain, and GNU manuals support direct online reading and legal download. Copyrighted reference books include metadata and official publisher links only—never unauthorized PDFs.
+        Copyright & Licensing Policy: KALI3977 is 100% free with zero fees or paywalls. Open-access, public-domain, and GNU manuals support direct online reading and legal download. Copyrighted reference books include metadata and official external publisher links only—never unauthorized PDFs.
       </div>
 
       {notice && (
@@ -317,8 +317,8 @@ export const BooksLibrary: React.FC = () => {
                     </div>
                     <div className="min-w-0 flex-1 space-y-1">
                       <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-mono">
-                        <span className={book.isFree ? 'text-emerald-500 font-semibold' : 'text-amber-500 font-semibold'}>
-                          {book.isFree ? 'Free / Open' : 'Paid Edition'}
+                        <span className={book.isFree ? 'text-emerald-500 font-semibold' : 'text-cyan-500 font-semibold'}>
+                          {book.isFree ? 'Open Access' : 'External Reference'}
                         </span>
                         <span className="text-slate-400">·</span>
                         <span className="text-slate-500 dark:text-slate-400">{book.difficulty}</span>

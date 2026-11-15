@@ -26,6 +26,7 @@ import {
   lessons,
   loginHistory,
   notifications,
+  platformSections,
   platformSettings,
   roomParticipations,
   rooms,
@@ -50,6 +51,24 @@ import {
   requireAuth,
   requirePermission,
 } from '../middleware/auth.ts';
+import {
+  ensurePlatformSectionsSeeded,
+  getPlatformSections,
+  invalidateSectionCache,
+  requireSectionEnabled,
+  syncLegacyControlsFromSection,
+  syncSectionFromLegacyToggle,
+} from '../middleware/section-guard.ts';
+import {
+  deriveSectionFlags,
+  getSectionDefinition,
+  normalizeSectionDisplayStatus,
+} from '../lib/domain/sections.ts';
+import {
+  evaluateLabCompletionRequest,
+  evaluateLabLaunchDecision,
+  sanitizeLabAssessmentForStudent,
+} from '../lib/domain/labs.ts';
 import {
   SlidingWindowRateLimiter,
   analyzeWeakSkills,
@@ -91,6 +110,11 @@ import {
   validateIpReportInput,
 } from '../lib/domain/anti-abuse.ts';
 import { createGamesRouter } from './games-routes.ts';
+import { createLearnKaliAdminRouter, createLearnKaliRouter } from './learn-kali-routes.ts';
+import {
+  getExternalRunnerConfigStatus,
+  getFutureRunnerArchitecturePlan,
+} from './lab-runner-client.ts';
 import crypto from 'node:crypto';
 
 const flagRateLimiter = new SlidingWindowRateLimiter();
@@ -178,6 +202,30 @@ export function createApiRouter(): Router {
 
   router.get('/health', (_req, res) => {
     res.json({ ok: true, service: 'kali3977-api' });
+  });
+
+  // Public section availability state (non-sensitive visibility flags)
+  router.get('/sections', async (_req, res) => {
+    const sections = await getPlatformSections();
+    res.json({
+      sections: sections.map((s) => ({
+        sectionKey: s.sectionKey,
+        sectionName: s.sectionName,
+        description: s.description,
+        category: s.category,
+        isLockable: s.isLockable,
+        enabledStatus: s.enabledStatus,
+        displayStatus: s.displayStatus,
+        maintenanceStatus: s.maintenanceStatus,
+        statusMessage: s.statusMessage,
+        sortOrder: s.sortOrder,
+      })),
+    });
+  });
+
+  // Guarded Career foundation endpoint
+  router.get('/career', optionalAuth, requireSectionEnabled('career'), (_req, res) => {
+    res.json({ ok: true, section: 'career', status: 'enabled' });
   });
 
   // Anti-scraping, bulk-extraction detection & adaptive rate-limit protection
@@ -683,6 +731,8 @@ export function createApiRouter(): Router {
         };
       }
 
+      const sectionList = await getPlatformSections();
+
       res.json({
         platformStats: {
           totalUsers: userCount[0]?.count ?? 0,
@@ -699,6 +749,16 @@ export function createApiRouter(): Router {
           (settingsRow[0]?.valueJson?.globalAnnouncement as string) ||
           'Welcome to KALI3977 Worldwide Cybersecurity Platform.',
         platformControls: settingsRow[0]?.valueJson || {},
+        sections: sectionList.map((s) => ({
+          sectionKey: s.sectionKey,
+          sectionName: s.sectionName,
+          isLockable: s.isLockable,
+          enabledStatus: s.enabledStatus,
+          displayStatus: s.displayStatus,
+          maintenanceStatus: s.maintenanceStatus,
+          statusMessage: s.statusMessage,
+          sortOrder: s.sortOrder,
+        })),
         playerDashboard,
       });
     } catch (err) {
@@ -710,7 +770,7 @@ export function createApiRouter(): Router {
   // =========================================================================
   // 3. LEARNING ACADEMY (Stages 1-8, EN/HI, Quizzes, Notes, Certificates)
   // =========================================================================
-  router.get('/academy', optionalAuth, async (req: AuthRequest, res) => {
+  router.get('/academy', optionalAuth, requireSectionEnabled('academy'), async (req: AuthRequest, res) => {
     const [courseList, lessonList, diagList] = await Promise.all([
       db.select().from(courses).where(eq(courses.published, true)).orderBy(courses.stage, courses.orderIndex),
       db.select().from(lessons).where(eq(lessons.published, true)).orderBy(lessons.orderIndex),
@@ -762,7 +822,7 @@ export function createApiRouter(): Router {
     res.json({ courses: enriched, diagnostics: safeDiagnostics, userSkills: skillAssessments });
   });
 
-  router.post('/academy/diagnostics/:slug/submit', requireAuth, async (req: AuthRequest, res) => {
+  router.post('/academy/diagnostics/:slug/submit', requireAuth, requireSectionEnabled('academy'), async (req: AuthRequest, res) => {
     const u = req.dbUser!;
     const slug = sanitizeText(String(req.params.slug || ''), 80);
     const [diag] = await db
@@ -831,7 +891,7 @@ export function createApiRouter(): Router {
   // =========================================================================
   // 3B. BOOKS & KNOWLEDGE LIBRARY (Open Access + Legal Publisher Links)
   // =========================================================================
-  router.get('/books', optionalAuth, async (req: AuthRequest, res) => {
+  router.get('/books', optionalAuth, requireSectionEnabled('books'), async (req: AuthRequest, res) => {
     const bookList = await db
       .select()
       .from(books)
@@ -856,7 +916,7 @@ export function createApiRouter(): Router {
     });
   });
 
-  router.post('/books/:bookId/progress', requireAuth, async (req: AuthRequest, res) => {
+  router.post('/books/:bookId/progress', requireAuth, requireSectionEnabled('books'), async (req: AuthRequest, res) => {
     const u = req.dbUser!;
     const bookId = Number(req.params.bookId);
     const [book] = await db.select().from(books).where(eq(books.id, bookId)).limit(1);
@@ -906,7 +966,7 @@ export function createApiRouter(): Router {
     res.json({ ok: true, progress: saved });
   });
 
-  router.post('/academy/lessons/:lessonId/progress', requireAuth, async (req: AuthRequest, res) => {
+  router.post('/academy/lessons/:lessonId/progress', requireAuth, requireSectionEnabled('academy'), async (req: AuthRequest, res) => {
     const u = req.dbUser!;
     const lessonId = Number(req.params.lessonId);
     const [lesson] = await db.select().from(lessons).where(eq(lessons.id, lessonId)).limit(1);
@@ -1007,9 +1067,14 @@ export function createApiRouter(): Router {
   });
 
   // =========================================================================
-  // 4. CYBER LABS (Isolated MicroVM Architecture + Proof Verification)
+  // 4. CYBER LABS (Interactive Walkthroughs + External MicroVM Architecture)
   // =========================================================================
-  router.get('/labs', optionalAuth, async (req: AuthRequest, res) => {
+  const isExternalRunnerConfigured = () => getExternalRunnerConfigStatus().configured;
+
+  router.get('/labs', optionalAuth, requireSectionEnabled('labs'), async (req: AuthRequest, res) => {
+    const isAdminViewer = Boolean(
+      req.dbUser && ['owner', 'event_admin', 'moderator'].includes(req.dbUser.role),
+    );
     const labRows = await db
       .select({
         id: labs.id,
@@ -1020,14 +1085,33 @@ export function createApiRouter(): Router {
         difficulty: labs.difficulty,
         objectivesJson: labs.objectivesJson,
         hintsJson: labs.hintsJson,
+        walkthroughJson: labs.walkthroughJson,
+        assessmentJson: labs.assessmentJson,
         timeLimitMinutes: labs.timeLimitMinutes,
         cpuLimitMilli: labs.cpuLimitMilli,
         ramLimitMb: labs.ramLimitMb,
+        storageLimitMb: labs.storageLimitMb,
+        networkPolicy: labs.networkPolicy,
+        imageRef: labs.imageRef,
         isolationBackend: labs.isolationBackend,
+        runnerRequired: labs.runnerRequired,
+        verificationRequired: labs.verificationRequired,
+        verificationMode: labs.verificationMode,
         xpReward: labs.xpReward,
+        enabled: labs.enabled,
       })
       .from(labs)
-      .where(eq(labs.published, true));
+      .where(
+        isAdminViewer
+          ? eq(labs.published, true)
+          : and(eq(labs.published, true), eq(labs.enabled, true)),
+      )
+      .orderBy(labs.runnerRequired, labs.xpReward, labs.id);
+
+    const sanitizedLabs = labRows.map((row) => ({
+      ...row,
+      assessmentJson: sanitizeLabAssessmentForStudent(row.assessmentJson),
+    }));
 
     let sessions: Array<typeof labSessions.$inferSelect> = [];
     if (req.dbUser) {
@@ -1038,88 +1122,218 @@ export function createApiRouter(): Router {
         .orderBy(desc(labSessions.startedAt));
     }
 
-    res.json({ labs: labRows, sessions });
+    res.json({
+      labs: sanitizedLabs,
+      sessions,
+      runnerConnected: isExternalRunnerConfigured(),
+    });
   });
 
-  router.post('/labs/:labId/launch', requireAuth, async (req: AuthRequest, res) => {
+  router.post('/labs/:labId/launch', requireAuth, requireSectionEnabled('labs'), async (req: AuthRequest, res) => {
     const u = req.dbUser!;
     const labId = Number(req.params.labId);
+    if (!Number.isInteger(labId) || labId <= 0) {
+      return res.status(400).json({ error: 'Invalid lab identifier.' });
+    }
     const [lab] = await db.select().from(labs).where(eq(labs.id, labId)).limit(1);
     if (!lab) return res.status(404).json({ error: 'Lab not found.' });
 
+    const runnerConnected = isExternalRunnerConfigured();
+    const decision = evaluateLabLaunchDecision(lab, runnerConnected);
+    if (!decision.allowed) {
+      return res.status(decision.httpStatus).json({ error: decision.message });
+    }
+
+    const expiresAt = new Date(Date.now() + lab.timeLimitMinutes * 60 * 1000);
     const [session] = await db
       .insert(labSessions)
       .values({
+        sessionUuid: crypto.randomUUID(),
         labId,
         userId: u.id,
-        status: 'provision_required',
+        status: decision.sessionStatus,
+        expiresAt,
       })
       .returning();
 
     res.json({
       session,
-      infrastructureRequired: true,
-      message:
-        'Lab session registered. Live container execution requires an external isolated microVM runner (Firecracker/Kata) separated from the production backend.',
+      infrastructureRequired: decision.infrastructureRequired,
+      runnerConnected: decision.runnerConnected,
+      message: decision.message,
     });
   });
 
-  router.post('/labs/:labId/reset', requireAuth, async (req: AuthRequest, res) => {
+  router.post('/labs/:labId/reset', requireAuth, requireSectionEnabled('labs'), async (req: AuthRequest, res) => {
     const u = req.dbUser!;
     const labId = Number(req.params.labId);
+    if (!Number.isInteger(labId) || labId <= 0) {
+      return res.status(400).json({ error: 'Invalid lab identifier.' });
+    }
+    const [lab] = await db.select().from(labs).where(eq(labs.id, labId)).limit(1);
+    if (!lab || !lab.published || !lab.enabled) {
+      return res.status(403).json({ error: 'This cyber lab is currently disabled or unavailable.' });
+    }
+
     const [latest] = await db
       .select()
       .from(labSessions)
       .where(and(eq(labSessions.labId, labId), eq(labSessions.userId, u.id)))
       .orderBy(desc(labSessions.startedAt))
       .limit(1);
-    if (!latest) return res.status(404).json({ error: 'No active lab session found.' });
+    if (!latest) return res.status(404).json({ error: 'No lab session found to reset.' });
+
+    const decision = evaluateLabLaunchDecision(lab, isExternalRunnerConfigured());
+    const expiresAt = new Date(Date.now() + lab.timeLimitMinutes * 60 * 1000);
+
+    // Preserve completed/xpAwarded history by starting a fresh practice session row if already completed
+    if (latest.status === 'completed' || latest.xpAwarded) {
+      const [freshPractice] = await db
+        .insert(labSessions)
+        .values({
+          sessionUuid: crypto.randomUUID(),
+          labId,
+          userId: u.id,
+          status: decision.sessionStatus,
+          expiresAt,
+          resetCount: latest.resetCount + 1,
+        })
+        .returning();
+      return res.json({ session: freshPractice });
+    }
 
     const [updated] = await db
       .update(labSessions)
       .set({
-        status: 'provision_required',
+        sessionUuid: crypto.randomUUID(),
+        status: decision.sessionStatus,
         resetCount: latest.resetCount + 1,
         startedAt: new Date(),
+        expiresAt,
+        terminatedAt: null,
+        failureReason: null,
       })
       .where(eq(labSessions.id, latest.id))
       .returning();
     res.json({ session: updated });
   });
 
-  router.post('/labs/:labId/verify', requireAuth, async (req: AuthRequest, res) => {
+  router.post('/labs/:labId/verify', requireAuth, requireSectionEnabled('labs'), async (req: AuthRequest, res) => {
     const u = req.dbUser!;
     const labId = Number(req.params.labId);
+    if (!Number.isInteger(labId) || labId <= 0) {
+      return res.status(400).json({ error: 'Invalid lab identifier.' });
+    }
     const token = sanitizeText(String(req.body.token || ''), 120);
-    const [lab] = await db.select().from(labs).where(eq(labs.id, labId)).limit(1);
-    if (!lab) return res.status(404).json({ error: 'Lab not found.' });
+    const rawSelected = req.body.selectedOption;
+    const selectedOption =
+      typeof rawSelected === 'number' && Number.isInteger(rawSelected) ? rawSelected : null;
 
-    if (!verifyFlagConstantTime(token, lab.verificationTokenHash)) {
-      return res.status(400).json({ ok: false, error: 'Verification token is invalid for this lab.' });
+    const txResult = await db.transaction(async (tx) => {
+      // Lock the user row to serialize concurrent verification requests and eliminate XP double-award races
+      await tx.execute(sql`SELECT id FROM users WHERE id = ${u.id} FOR UPDATE`);
+
+      const [lab] = await tx.select().from(labs).where(eq(labs.id, labId)).limit(1);
+      if (!lab) {
+        return { errorStatus: 404, error: 'Lab not found.' as const };
+      }
+
+      const userSessions = await tx
+        .select()
+        .from(labSessions)
+        .where(and(eq(labSessions.labId, labId), eq(labSessions.userId, u.id)))
+        .orderBy(desc(labSessions.startedAt));
+
+      const latestSession = userSessions[0] ?? null;
+      const alreadyAwardedForLab = userSessions.some(
+        (s) => s.xpAwarded || s.status === 'completed',
+      );
+
+      const decision = evaluateLabCompletionRequest({
+        lab,
+        latestSession,
+        alreadyAwardedForLab,
+        submittedToken: token,
+        selectedOption,
+        verifyTokenFn: verifyFlagConstantTime,
+      });
+
+      if (!decision.allowed || !latestSession) {
+        return {
+          errorStatus: decision.httpStatus,
+          error: decision.error || 'Verification failed.',
+        };
+      }
+
+      const now = new Date();
+      let savedSession = latestSession;
+      if (latestSession.status !== 'completed') {
+        const [updated] = await tx
+          .update(labSessions)
+          .set({
+            status: 'completed',
+            verified: true,
+            completedAt: now,
+            xpAwarded: decision.xpToAward > 0,
+            xpAwardedAt: decision.xpToAward > 0 ? now : null,
+          })
+          .where(eq(labSessions.id, latestSession.id))
+          .returning();
+        savedSession = updated;
+      }
+
+      if (decision.xpToAward > 0) {
+        const today = now.toISOString().slice(0, 10);
+        const [currentUser] = await tx
+          .select({ lastActiveDate: users.lastActiveDate, dailyStreak: users.dailyStreak })
+          .from(users)
+          .where(eq(users.id, u.id))
+          .limit(1);
+        const newStreak =
+          currentUser?.lastActiveDate === today
+            ? currentUser.dailyStreak
+            : (currentUser?.dailyStreak ?? 0) + 1;
+        await tx
+          .update(users)
+          .set({
+            xp: sql`${users.xp} + ${decision.xpToAward}`,
+            dailyStreak: newStreak,
+            lastActiveDate: today,
+            updatedAt: now,
+          })
+          .where(eq(users.id, u.id));
+      }
+
+      return {
+        errorStatus: 0,
+        session: savedSession,
+        xpAwarded: decision.xpToAward,
+        alreadyCompleted: decision.alreadyCompleted,
+        explanation: decision.explanation ?? null,
+      };
+    });
+
+    if ('error' in txResult) {
+      return res.status(txResult.errorStatus).json({ ok: false, error: txResult.error });
     }
 
-    const [completed] = await db
-      .insert(labSessions)
-      .values({
-        labId,
-        userId: u.id,
-        status: 'completed',
-        completedAt: new Date(),
-      })
-      .returning();
+    if (txResult.xpAwarded > 0) {
+      await grantAchievementIfMissing(u.id, 'LAB_PRACTITIONER');
+    }
 
-    await db
-      .update(users)
-      .set({ xp: sql`${users.xp} + ${lab.xpReward}`, updatedAt: new Date() })
-      .where(eq(users.id, u.id));
-
-    res.json({ ok: true, session: completed, xpAwarded: lab.xpReward });
+    res.json({
+      ok: true,
+      session: txResult.session,
+      xpAwarded: txResult.xpAwarded,
+      alreadyCompleted: txResult.alreadyCompleted,
+      explanation: txResult.explanation,
+    });
   });
 
   // =========================================================================
   // 5. CTF ARENA (Server-Side Flag Verification, Dynamic Scoring, Anti-Cheat)
   // =========================================================================
-  router.get('/ctf', optionalAuth, async (req: AuthRequest, res) => {
+  router.get('/ctf', optionalAuth, requireSectionEnabled('ctf'), async (req: AuthRequest, res) => {
     const rows = await db
       .select({
         id: ctfChallenges.id,
@@ -1216,7 +1430,7 @@ export function createApiRouter(): Router {
     res.json({ challenges, submissions, externalPlatforms: EXTERNAL_CTF_PLATFORMS });
   });
 
-  router.post('/ctf/:challengeId/bookmark', requireAuth, async (req: AuthRequest, res) => {
+  router.post('/ctf/:challengeId/bookmark', requireAuth, requireSectionEnabled('ctf'), async (req: AuthRequest, res) => {
     const u = req.dbUser!;
     const challengeId = Number(req.params.challengeId);
     const [existing] = await db
@@ -1232,7 +1446,7 @@ export function createApiRouter(): Router {
     res.json({ bookmarked: true });
   });
 
-  router.post('/ctf/:challengeId/report', requireAuth, async (req: AuthRequest, res) => {
+  router.post('/ctf/:challengeId/report', requireAuth, requireSectionEnabled('ctf'), async (req: AuthRequest, res) => {
     const u = req.dbUser!;
     const challengeId = Number(req.params.challengeId);
     const reason = sanitizeText(String(req.body.reason || 'Challenge issue reported by player'), 300);
@@ -1248,7 +1462,7 @@ export function createApiRouter(): Router {
     res.json({ ok: true, report });
   });
 
-  router.get('/ctf/:challengeId/artifact', optionalAuth, async (req: AuthRequest, res) => {
+  router.get('/ctf/:challengeId/artifact', optionalAuth, requireSectionEnabled('ctf'), async (req: AuthRequest, res) => {
     const challengeId = Number(req.params.challengeId);
     const [ch] = await db
       .select()
@@ -1291,7 +1505,7 @@ export function createApiRouter(): Router {
     res.send(ch.attachmentContent);
   });
 
-  router.post('/ctf/:challengeId/submit', requireAuth, async (req: AuthRequest, res) => {
+  router.post('/ctf/:challengeId/submit', requireAuth, requireSectionEnabled('ctf'), async (req: AuthRequest, res) => {
     const u = req.dbUser!;
     const challengeId = Number(req.params.challengeId);
     const rawFlag = sanitizeText(String(req.body.flag || ''), 160);
@@ -1441,7 +1655,7 @@ export function createApiRouter(): Router {
   // =========================================================================
   // 6. MULTIPLAYER ARENA (Distinct Room Code + Team Code System)
   // =========================================================================
-  router.get('/arena', optionalAuth, async (req: AuthRequest, res) => {
+  router.get('/arena', optionalAuth, requireSectionEnabled('arena'), async (req: AuthRequest, res) => {
     const [compList, roomList, teamList, partCounts] = await Promise.all([
       db.select().from(competitions).where(eq(competitions.visibility, 'public')).orderBy(desc(competitions.startsAt)),
       db.select().from(rooms),
@@ -1530,7 +1744,7 @@ export function createApiRouter(): Router {
     });
   });
 
-  router.get('/arena/lobby/:competitionId', requireAuth, async (req: AuthRequest, res) => {
+  router.get('/arena/lobby/:competitionId', requireAuth, requireSectionEnabled('arena'), async (req: AuthRequest, res) => {
     const u = req.dbUser!;
     const competitionId = Number(req.params.competitionId);
 
@@ -1610,7 +1824,7 @@ export function createApiRouter(): Router {
     });
   });
 
-  router.post('/arena/join', requireAuth, async (req: AuthRequest, res) => {
+  router.post('/arena/join', requireAuth, requireSectionEnabled('arena'), async (req: AuthRequest, res) => {
     const u = req.dbUser!;
     if (!u.policyAcknowledgedAt && !req.body.acknowledgePolicy) {
       return res.status(400).json({
@@ -1803,7 +2017,7 @@ export function createApiRouter(): Router {
   // =========================================================================
   // 7. TEAM COMMUNICATION SYSTEM (Server-Enforced Channel Isolation)
   // =========================================================================
-  router.get('/chat/channels', requireAuth, async (req: AuthRequest, res) => {
+  router.get('/chat/channels', requireAuth, requireSectionEnabled('arena'), async (req: AuthRequest, res) => {
     const u = req.dbUser!;
     const memberships = await db
       .select()
@@ -1829,7 +2043,7 @@ export function createApiRouter(): Router {
     res.json({ channels: accessible });
   });
 
-  router.get('/chat/channels/:channelId/messages', requireAuth, async (req: AuthRequest, res) => {
+  router.get('/chat/channels/:channelId/messages', requireAuth, requireSectionEnabled('arena'), async (req: AuthRequest, res) => {
     const u = req.dbUser!;
     const channelId = Number(req.params.channelId);
     const [ch] = await db.select().from(chatChannels).where(eq(chatChannels.id, channelId)).limit(1);
@@ -1894,7 +2108,7 @@ export function createApiRouter(): Router {
     });
   });
 
-  router.post('/chat/channels/:channelId/messages', requireAuth, async (req: AuthRequest, res) => {
+  router.post('/chat/channels/:channelId/messages', requireAuth, requireSectionEnabled('arena'), async (req: AuthRequest, res) => {
     const u = req.dbUser!;
     const chatRate = chatRateLimiter.check(`chat:${u.id}`, 20, 60_000);
     if (!chatRate.allowed) {
@@ -1965,7 +2179,7 @@ export function createApiRouter(): Router {
     res.status(201).json({ message: fullMessage });
   });
 
-  router.delete('/chat/messages/:messageId', requireAuth, async (req: AuthRequest, res) => {
+  router.delete('/chat/messages/:messageId', requireAuth, requireSectionEnabled('arena'), async (req: AuthRequest, res) => {
     const u = req.dbUser!;
     const messageId = Number(req.params.messageId);
     const [msg] = await db.select().from(chatMessages).where(eq(chatMessages.id, messageId)).limit(1);
@@ -2009,7 +2223,7 @@ export function createApiRouter(): Router {
     res.json({ ok: true });
   });
 
-  router.post('/chat/channels/:channelId/mute', requireAuth, async (req: AuthRequest, res) => {
+  router.post('/chat/channels/:channelId/mute', requireAuth, requireSectionEnabled('arena'), async (req: AuthRequest, res) => {
     const u = req.dbUser!;
     const channelId = Number(req.params.channelId);
     const targetUserId = Number(req.body.userId);
@@ -2052,7 +2266,7 @@ export function createApiRouter(): Router {
     res.json({ ok: true, member: updated });
   });
 
-  router.post('/chat/messages/:messageId/pin', requireAuth, async (req: AuthRequest, res) => {
+  router.post('/chat/messages/:messageId/pin', requireAuth, requireSectionEnabled('arena'), async (req: AuthRequest, res) => {
     const u = req.dbUser!;
     const messageId = Number(req.params.messageId);
     const [msg] = await db.select().from(chatMessages).where(eq(chatMessages.id, messageId)).limit(1);
@@ -2091,7 +2305,7 @@ export function createApiRouter(): Router {
     res.json({ ok: true, message: updated });
   });
 
-  router.post('/chat/messages/:messageId/report', requireAuth, async (req: AuthRequest, res) => {
+  router.post('/chat/messages/:messageId/report', requireAuth, requireSectionEnabled('arena'), async (req: AuthRequest, res) => {
     const u = req.dbUser!;
     const messageId = Number(req.params.messageId);
     const reason = sanitizeText(String(req.body.reason || 'Inappropriate behavior'), 300);
@@ -2112,7 +2326,7 @@ export function createApiRouter(): Router {
   // =========================================================================
   // 8. TOURNAMENTS & EVENTS
   // =========================================================================
-  router.get('/tournaments', optionalAuth, async (_req, res) => {
+  router.get('/tournaments', optionalAuth, requireSectionEnabled('tournaments'), async (_req, res) => {
     const [tList, regs] = await Promise.all([
       db.select().from(tournaments).orderBy(desc(tournaments.startsAt)),
       db
@@ -2129,7 +2343,7 @@ export function createApiRouter(): Router {
     res.json({ tournaments: tList, registrations: regs });
   });
 
-  router.post('/tournaments/:id/register', requireAuth, async (req: AuthRequest, res) => {
+  router.post('/tournaments/:id/register', requireAuth, requireSectionEnabled('tournaments'), async (req: AuthRequest, res) => {
     const u = req.dbUser!;
     const tournamentId = Number(req.params.id);
     const teamId = Number(req.body.teamId);
@@ -2170,7 +2384,7 @@ export function createApiRouter(): Router {
   // =========================================================================
   // 10. COMMUNITY, NOTIFICATIONS, LEADERBOARDS, CERTIFICATE VERIFICATION
   // =========================================================================
-  router.get('/community', async (req, res) => {
+  router.get('/community', optionalAuth, requireSectionEnabled('community'), async (req, res) => {
     const topic = sanitizeText(String(req.query.topic || ''), 40);
     const q = sanitizeText(String(req.query.q || ''), 80);
 
@@ -2239,7 +2453,7 @@ export function createApiRouter(): Router {
     });
   });
 
-  router.post('/community', requireAuth, async (req: AuthRequest, res) => {
+  router.post('/community', requireAuth, requireSectionEnabled('community'), async (req: AuthRequest, res) => {
     const u = req.dbUser!;
     const controls = await getPlatformControls();
     if (controls.disableCommunity && u.role !== 'owner') {
@@ -2258,7 +2472,7 @@ export function createApiRouter(): Router {
     res.status(201).json({ post });
   });
 
-  router.post('/community/:id/replies', requireAuth, async (req: AuthRequest, res) => {
+  router.post('/community/:id/replies', requireAuth, requireSectionEnabled('community'), async (req: AuthRequest, res) => {
     const u = req.dbUser!;
     const controls = await getPlatformControls();
     if (controls.disableCommunity && u.role !== 'owner') {
@@ -2282,7 +2496,7 @@ export function createApiRouter(): Router {
     res.status(201).json({ reply });
   });
 
-  router.patch('/community/:id', requireAuth, async (req: AuthRequest, res) => {
+  router.patch('/community/:id', requireAuth, requireSectionEnabled('community'), async (req: AuthRequest, res) => {
     const u = req.dbUser!;
     const id = Number(req.params.id);
     const [existing] = await db.select().from(communityPosts).where(eq(communityPosts.id, id)).limit(1);
@@ -2300,7 +2514,7 @@ export function createApiRouter(): Router {
     res.json({ post: updated });
   });
 
-  router.delete('/community/:id', requireAuth, async (req: AuthRequest, res) => {
+  router.delete('/community/:id', requireAuth, requireSectionEnabled('community'), async (req: AuthRequest, res) => {
     const u = req.dbUser!;
     const id = Number(req.params.id);
     const [existing] = await db.select().from(communityPosts).where(eq(communityPosts.id, id)).limit(1);
@@ -2316,7 +2530,7 @@ export function createApiRouter(): Router {
     res.json({ ok: true });
   });
 
-  router.post('/community/:id/report', requireAuth, async (req: AuthRequest, res) => {
+  router.post('/community/:id/report', requireAuth, requireSectionEnabled('community'), async (req: AuthRequest, res) => {
     const u = req.dbUser!;
     const id = Number(req.params.id);
     const reason = sanitizeText(String(req.body.reason || 'Reported community post'), 300);
@@ -2328,7 +2542,7 @@ export function createApiRouter(): Router {
     res.json({ ok: true, report });
   });
 
-  router.post('/community/:id/upvote', requireAuth, async (req, res) => {
+  router.post('/community/:id/upvote', requireAuth, requireSectionEnabled('community'), async (req, res) => {
     const id = Number(req.params.id);
     const [updated] = await db
       .update(communityPosts)
@@ -4210,6 +4424,21 @@ export function createApiRouter(): Router {
           },
         });
 
+      await Promise.all([
+        syncSectionFromLegacyToggle({
+          sectionKey: 'mentor',
+          enabled: !valueJson.disableAiMentor,
+          actorId: actor.id,
+          actorEmail: actor.email,
+        }),
+        syncSectionFromLegacyToggle({
+          sectionKey: 'community',
+          enabled: !valueJson.disableCommunity,
+          actorId: actor.id,
+          actorEmail: actor.email,
+        }),
+      ]);
+
       await recordAuditLog({
         actorId: actor.id,
         actorEmail: actor.email,
@@ -4221,6 +4450,183 @@ export function createApiRouter(): Router {
       });
 
       res.json({ settings: saved.valueJson });
+    },
+  );
+
+  // =========================================================================
+  // GLOBAL SECTION MANAGEMENT ADMIN ROUTES (Persistent & Audited)
+  // =========================================================================
+  router.get(
+    '/admin/sections',
+    requireAuth,
+    requirePermission('admin:view_analytics'),
+    async (_req, res) => {
+      await ensurePlatformSectionsSeeded();
+      const [sections, sectionAuditLogs] = await Promise.all([
+        getPlatformSections(true),
+        db
+          .select({
+            id: auditLogs.id,
+            actorEmail: auditLogs.actorEmail,
+            action: auditLogs.action,
+            resourceId: auditLogs.resourceId,
+            previousStateJson: auditLogs.previousStateJson,
+            newStateJson: auditLogs.newStateJson,
+            createdAt: auditLogs.createdAt,
+          })
+          .from(auditLogs)
+          .where(eq(auditLogs.resourceType, 'platform_section'))
+          .orderBy(desc(auditLogs.createdAt))
+          .limit(30),
+      ]);
+
+      res.json({
+        sections,
+        auditLogs: sectionAuditLogs,
+      });
+    },
+  );
+
+  router.post(
+    '/admin/sections/bulk',
+    requireAuth,
+    requirePermission('admin:platform_settings'),
+    async (req: AuthRequest, res) => {
+      const actor = req.dbUser!;
+      const action = req.body?.action === 'disable_all' ? 'disable_all' : req.body?.action === 'enable_all' ? 'enable_all' : null;
+      if (!action) {
+        return res.status(400).json({ error: 'Invalid bulk action. Use enable_all or disable_all.' });
+      }
+
+      await ensurePlatformSectionsSeeded();
+      const targetDisplayStatus = action === 'enable_all' ? 'enabled' : 'disabled';
+      const flags = deriveSectionFlags({ displayStatus: targetDisplayStatus, isLockable: true });
+      const statusMessage =
+        typeof req.body?.statusMessage === 'string'
+          ? sanitizeText(req.body.statusMessage, 240)
+          : '';
+
+      await db
+        .update(platformSections)
+        .set({
+          enabledStatus: flags.enabledStatus,
+          displayStatus: flags.displayStatus,
+          maintenanceStatus: flags.maintenanceStatus,
+          ...(req.body?.statusMessage !== undefined ? { statusMessage } : {}),
+          updatedById: actor.id,
+          updatedByEmail: actor.email,
+          updatedAt: new Date(),
+        })
+        .where(eq(platformSections.isLockable, true));
+
+      await syncLegacyControlsFromSection({ sectionKey: 'mentor', enabled: flags.enabledStatus, actorId: actor.id });
+      await syncLegacyControlsFromSection({ sectionKey: 'community', enabled: flags.enabledStatus, actorId: actor.id });
+      invalidateSectionCache();
+
+      await recordAuditLog({
+        actorId: actor.id,
+        actorEmail: actor.email,
+        action: action === 'enable_all' ? 'SECTIONS_BULK_ENABLE_ALL' : 'SECTIONS_BULK_DISABLE_ALL',
+        resourceType: 'platform_section',
+        resourceId: 'bulk',
+        newStateJson: { action, displayStatus: flags.displayStatus, statusMessage },
+        ipAddress: req.ip,
+      });
+
+      const sections = await getPlatformSections(true);
+      res.json({ ok: true, sections });
+    },
+  );
+
+  router.post(
+    '/admin/sections/:key',
+    requireAuth,
+    requirePermission('admin:platform_settings'),
+    async (req: AuthRequest, res) => {
+      const actor = req.dbUser!;
+      const sectionKey = sanitizeText(String(req.params.key || ''), 40);
+      const def = getSectionDefinition(sectionKey);
+      if (!def) {
+        return res.status(404).json({ error: `Unknown platform section "${sectionKey}".` });
+      }
+      if (!def.isLockable) {
+        return res.status(400).json({
+          error: `Section "${def.sectionName}" is a core protected section and cannot be disabled.`,
+        });
+      }
+
+      await ensurePlatformSectionsSeeded();
+      const [existing] = await db
+        .select()
+        .from(platformSections)
+        .where(eq(platformSections.sectionKey, sectionKey))
+        .limit(1);
+
+      const requestedDisplayStatus =
+        req.body?.displayStatus !== undefined
+          ? normalizeSectionDisplayStatus(req.body.displayStatus)
+          : req.body?.maintenanceStatus === true
+            ? 'maintenance'
+            : req.body?.enabledStatus === false
+              ? 'disabled'
+              : 'enabled';
+
+      const flags = deriveSectionFlags({
+        displayStatus: requestedDisplayStatus,
+        isLockable: def.isLockable,
+      });
+
+      const statusMessage =
+        typeof req.body?.statusMessage === 'string'
+          ? sanitizeText(req.body.statusMessage, 240)
+          : existing?.statusMessage ?? '';
+
+      const [updated] = await db
+        .update(platformSections)
+        .set({
+          enabledStatus: flags.enabledStatus,
+          displayStatus: flags.displayStatus,
+          maintenanceStatus: flags.maintenanceStatus,
+          statusMessage,
+          updatedById: actor.id,
+          updatedByEmail: actor.email,
+          updatedAt: new Date(),
+        })
+        .where(eq(platformSections.sectionKey, sectionKey))
+        .returning();
+
+      await syncLegacyControlsFromSection({
+        sectionKey,
+        enabled: flags.enabledStatus,
+        actorId: actor.id,
+      });
+      invalidateSectionCache();
+
+      await recordAuditLog({
+        actorId: actor.id,
+        actorEmail: actor.email,
+        action: 'SECTION_STATUS_UPDATED',
+        resourceType: 'platform_section',
+        resourceId: sectionKey,
+        previousStateJson: existing
+          ? {
+              enabledStatus: existing.enabledStatus,
+              displayStatus: existing.displayStatus,
+              maintenanceStatus: existing.maintenanceStatus,
+              statusMessage: existing.statusMessage,
+            }
+          : null,
+        newStateJson: {
+          enabledStatus: flags.enabledStatus,
+          displayStatus: flags.displayStatus,
+          maintenanceStatus: flags.maintenanceStatus,
+          statusMessage,
+        },
+        ipAddress: req.ip,
+      });
+
+      const sections = await getPlatformSections(true);
+      res.json({ ok: true, section: updated, sections });
     },
   );
 
@@ -4576,8 +4982,193 @@ export function createApiRouter(): Router {
     },
   );
 
+  // Admin Cyber Labs Operations & Verification Control
+  router.get(
+    '/admin/labs',
+    requireAuth,
+    requirePermission('admin:view_analytics'),
+    async (_req, res) => {
+      const [allLabs, recentSessions] = await Promise.all([
+        db
+          .select({
+            id: labs.id,
+            slug: labs.slug,
+            category: labs.category,
+            title: labs.title,
+            difficulty: labs.difficulty,
+            timeLimitMinutes: labs.timeLimitMinutes,
+            cpuLimitMilli: labs.cpuLimitMilli,
+            ramLimitMb: labs.ramLimitMb,
+            storageLimitMb: labs.storageLimitMb,
+            networkPolicy: labs.networkPolicy,
+            imageRef: labs.imageRef,
+            isolationBackend: labs.isolationBackend,
+            runnerRequired: labs.runnerRequired,
+            verificationRequired: labs.verificationRequired,
+            verificationMode: labs.verificationMode,
+            xpReward: labs.xpReward,
+            enabled: labs.enabled,
+            published: labs.published,
+          })
+          .from(labs)
+          .orderBy(labs.runnerRequired, labs.id),
+        db
+          .select({
+            id: labSessions.id,
+            sessionUuid: labSessions.sessionUuid,
+            labId: labSessions.labId,
+            labTitle: labs.title,
+            labSlug: labs.slug,
+            userId: labSessions.userId,
+            username: users.username,
+            userEmail: users.email,
+            status: labSessions.status,
+            verified: labSessions.verified,
+            xpAwarded: labSessions.xpAwarded,
+            startedAt: labSessions.startedAt,
+            expiresAt: labSessions.expiresAt,
+            completedAt: labSessions.completedAt,
+            terminatedAt: labSessions.terminatedAt,
+            resetCount: labSessions.resetCount,
+            failureReason: labSessions.failureReason,
+          })
+          .from(labSessions)
+          .innerJoin(labs, eq(labSessions.labId, labs.id))
+          .innerJoin(users, eq(labSessions.userId, users.id))
+          .orderBy(desc(labSessions.startedAt))
+          .limit(60),
+      ]);
+
+      res.json({
+        runnerConnected: isExternalRunnerConfigured(),
+        runnerStatus: getExternalRunnerConfigStatus(),
+        architecturePlan: getFutureRunnerArchitecturePlan(),
+        labs: allLabs,
+        sessions: recentSessions,
+      });
+    },
+  );
+
+  router.patch(
+    '/admin/labs/:labId',
+    requireAuth,
+    requirePermission('admin:manage_content'),
+    async (req: AuthRequest, res) => {
+      const actor = req.dbUser!;
+      const labId = Number(req.params.labId);
+      if (!Number.isInteger(labId) || labId <= 0) {
+        return res.status(400).json({ error: 'Invalid lab identifier.' });
+      }
+      const [existing] = await db.select().from(labs).where(eq(labs.id, labId)).limit(1);
+      if (!existing) {
+        return res.status(404).json({ error: 'Lab not found.' });
+      }
+
+      const nextEnabled =
+        typeof req.body.enabled === 'boolean' ? req.body.enabled : existing.enabled;
+      const nextVerificationRequired =
+        typeof req.body.verificationRequired === 'boolean'
+          ? req.body.verificationRequired
+          : existing.verificationRequired;
+      const nextPublished =
+        typeof req.body.published === 'boolean' ? req.body.published : existing.published;
+
+      const [updated] = await db
+        .update(labs)
+        .set({
+          enabled: nextEnabled,
+          verificationRequired: nextVerificationRequired,
+          published: nextPublished,
+        })
+        .where(eq(labs.id, labId))
+        .returning({
+          id: labs.id,
+          slug: labs.slug,
+          title: labs.title,
+          enabled: labs.enabled,
+          verificationRequired: labs.verificationRequired,
+          published: labs.published,
+          runnerRequired: labs.runnerRequired,
+          verificationMode: labs.verificationMode,
+        });
+
+      await recordAuditLog({
+        actorId: actor.id,
+        actorEmail: actor.email,
+        action: 'LAB_CONFIG_UPDATED',
+        resourceType: 'lab',
+        resourceId: existing.slug,
+        previousStateJson: {
+          enabled: existing.enabled,
+          verificationRequired: existing.verificationRequired,
+          published: existing.published,
+        },
+        newStateJson: {
+          enabled: updated.enabled,
+          verificationRequired: updated.verificationRequired,
+          published: updated.published,
+        },
+        ipAddress: req.ip,
+      });
+
+      res.json({ lab: updated });
+    },
+  );
+
+  router.post(
+    '/admin/labs/sessions/:sessionId/terminate',
+    requireAuth,
+    requirePermission('admin:manage_content'),
+    async (req: AuthRequest, res) => {
+      const actor = req.dbUser!;
+      const sessionId = Number(req.params.sessionId);
+      if (!Number.isInteger(sessionId) || sessionId <= 0) {
+        return res.status(400).json({ error: 'Invalid session identifier.' });
+      }
+      const reason = sanitizeText(
+        String(req.body.reason || 'Terminated by platform administrator'),
+        300,
+      );
+      const [existing] = await db
+        .select()
+        .from(labSessions)
+        .where(eq(labSessions.id, sessionId))
+        .limit(1);
+      if (!existing) {
+        return res.status(404).json({ error: 'Lab session not found.' });
+      }
+
+      const [updated] = await db
+        .update(labSessions)
+        .set({
+          status: 'terminated',
+          terminatedAt: new Date(),
+          failureReason: reason,
+        })
+        .where(eq(labSessions.id, sessionId))
+        .returning();
+
+      await recordAuditLog({
+        actorId: actor.id,
+        actorEmail: actor.email,
+        action: 'LAB_SESSION_TERMINATED',
+        resourceType: 'lab_session',
+        resourceId: String(sessionId),
+        previousStateJson: { status: existing.status },
+        newStateJson: { status: 'terminated', reason },
+        ipAddress: req.ip,
+      });
+
+      res.json({ session: updated });
+    },
+  );
+
   // Mount Games Arena Sub-Router (/api/games/*)
   router.use('/games', createGamesRouter());
+
+  // Mount Learn KALI Sub-Routers (/api/learn-kali/* and /api/admin/learn-kali/*)
+  router.use('/learn-kali', createLearnKaliRouter());
+  router.use('/admin/learn-kali', createLearnKaliAdminRouter());
 
   return router;
 }

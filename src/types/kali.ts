@@ -3,6 +3,7 @@ export type NavSection =
   | 'academy'
   | 'books'
   | 'labs'
+  | 'learn-kali'
   | 'ctf'
   | 'arena'
   | 'games'
@@ -15,6 +16,23 @@ export type NavSection =
   | 'settings'
   | 'legal'
   | 'admin';
+
+export type SectionDisplayStatus = 'enabled' | 'disabled' | 'coming_soon' | 'maintenance';
+
+export interface PlatformSectionState {
+  sectionKey: NavSection;
+  sectionName: string;
+  description: string;
+  category: string;
+  isLockable: boolean;
+  enabledStatus: boolean;
+  displayStatus: SectionDisplayStatus;
+  maintenanceStatus: boolean;
+  statusMessage: string;
+  sortOrder: number;
+  updatedByEmail?: string | null;
+  updatedAt?: string;
+}
 
 export interface UserProfile {
   id: number;

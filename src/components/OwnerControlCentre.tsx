@@ -18,9 +18,13 @@ import {
   Users,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useSections } from '../context/SectionContext';
 import { ConfirmDialog } from './ConfirmDialog';
 import { GamesAdminPanel } from './games/GamesAdminPanel';
 import { AiMentorAdminPanel } from './AiMentorAdminPanel';
+import { SectionManagementAdminPanel } from './SectionManagementAdminPanel';
+import { LabsAdminPanel } from './LabsAdminPanel';
+import { LearnKaliAdminPanel } from './LearnKaliAdminPanel';
 
 interface AdminOverview {
   metrics: {
@@ -316,10 +320,14 @@ type AdminTab =
   | 'moderation'
   | 'security'
   | 'games'
-  | 'ai_mentor';
+  | 'ai_mentor'
+  | 'sections'
+  | 'labs'
+  | 'learn_kali';
 
 export const OwnerControlCentre: React.FC = () => {
   const { user, apiFetch } = useAuth();
+  const { refreshSections } = useSections();
   const [data, setData] = useState<AdminOverview | null>(null);
   const [tab, setTab] = useState<AdminTab>('overview');
   const [search, setSearch] = useState('');
@@ -723,6 +731,7 @@ export const OwnerControlCentre: React.FC = () => {
         method: 'POST',
         body: JSON.stringify(settingsDraft),
       });
+      await refreshSections();
     });
   };
 
@@ -811,6 +820,9 @@ export const OwnerControlCentre: React.FC = () => {
           { id: 'security', label: 'G. Security & Settings' },
           { id: 'games', label: 'H. Games Arena' },
           { id: 'ai_mentor', label: 'I. AI Cyber Mentor' },
+          { id: 'sections', label: 'J. Section Management' },
+          { id: 'labs', label: 'K. Cyber Labs Ops' },
+          { id: 'learn_kali', label: 'L. Learn KALI' },
         ].map((t) => (
           <button
             key={t.id}
@@ -3186,6 +3198,15 @@ export const OwnerControlCentre: React.FC = () => {
 
       {/* SECTION I: AI CYBER MENTOR QUOTAS & BUDGET */}
       {tab === 'ai_mentor' && <AiMentorAdminPanel />}
+
+      {/* SECTION J: GLOBAL SECTION MANAGEMENT */}
+      {tab === 'sections' && <SectionManagementAdminPanel onSectionsChanged={loadAdmin} />}
+
+      {/* SECTION K: CYBER LABS OPS */}
+      {tab === 'labs' && <LabsAdminPanel />}
+
+      {/* SECTION L: LEARN KALI ADMINISTRATION */}
+      {tab === 'learn_kali' && <LearnKaliAdminPanel />}
 
       <ConfirmDialog
         open={Boolean(confirmAction)}

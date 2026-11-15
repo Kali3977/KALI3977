@@ -17,17 +17,20 @@ import {
   Shield,
   Sun,
   Swords,
+  Terminal,
   Trophy,
   User,
   Users,
   X,
 } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { SectionProvider, useSections } from './context/SectionContext';
 import type { NavSection } from './types/kali';
 import { HomeDashboard } from './components/HomeDashboard';
 import { LearningAcademy } from './components/LearningAcademy';
 import { BooksLibrary } from './components/BooksLibrary';
 import { CyberLabs } from './components/CyberLabs';
+import { LearnKaliFoundation } from './components/LearnKaliFoundation';
 import { CtfArena } from './components/CtfArena';
 import { MultiplayerArena } from './components/MultiplayerArena';
 import { GamesArenaHub } from './components/games/GamesArenaHub';
@@ -42,14 +45,17 @@ import {
 import { OwnerControlCentre } from './components/OwnerControlCentre';
 import { BrandMark } from './components/BrandMark';
 import { LegalIpHub } from './components/LegalIpHub';
+import { SectionUnavailableView, getUnavailableSectionTitle } from './components/SectionUnavailableView';
 import { KALI3977_COPYRIGHT_NOTICE } from './lib/domain/anti-abuse';
 import { parseNavSectionFromHash } from './lib/auth-helpers';
+import { getEffectiveSectionStatus } from './lib/domain/sections';
 
 const NAV_ITEMS: Array<{ id: NavSection; label: string; icon: React.ComponentType<{ className?: string }> }> = [
   { id: 'home', label: 'Home', icon: Home },
   { id: 'academy', label: 'Learning Academy', icon: BookOpen },
   { id: 'books', label: 'Books', icon: Library },
   { id: 'labs', label: 'Cyber Labs', icon: FlaskConical },
+  { id: 'learn-kali', label: 'Learn KALI', icon: Terminal },
   { id: 'ctf', label: 'CTF Arena', icon: Flag },
   { id: 'arena', label: 'Multiplayer Arena', icon: Swords },
   { id: 'games', label: 'Games Arena', icon: Gamepad2 },
@@ -77,6 +83,13 @@ const Shell: React.FC = () => {
     loginWithGoogle,
     logout,
   } = useAuth();
+  const {
+    previewAsStudent,
+    setPreviewAsStudent,
+    getSection,
+    isSectionVisibleInNav,
+    evaluateAccess,
+  } = useSections();
   const [active, setActive] = useState<NavSection>(() => {
     if (typeof window === 'undefined') return 'home';
     return parseNavSectionFromHash(window.location.hash) ?? 'home';
@@ -85,6 +98,8 @@ const Shell: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const isStaff = Boolean(user && ['owner', 'event_admin', 'moderator'].includes(user.role));
+  const visibleNavItems = NAV_ITEMS.filter((item) => isSectionVisibleInNav(item.id));
+  const activeAccess = evaluateAccess(active);
 
   useEffect(() => {
     const syncFromHash = () => {
@@ -135,9 +150,11 @@ const Shell: React.FC = () => {
         </div>
 
         <nav aria-label="Primary Navigation" className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
-          {NAV_ITEMS.map((item) => {
+          {visibleNavItems.map((item) => {
             const Icon = item.icon;
             const isActive = active === item.id;
+            const sec = getSection(item.id);
+            const effStatus = getEffectiveSectionStatus(sec);
             return (
               <button
                 key={item.id}
@@ -153,11 +170,15 @@ const Shell: React.FC = () => {
                   <Icon className="h-4 w-4 shrink-0" />
                   <span className="truncate">{item.label}</span>
                 </span>
-                {item.id === 'notifications' && unreadNotifications > 0 && (
+                {item.id === 'notifications' && unreadNotifications > 0 ? (
                   <span className="font-mono text-xs text-emerald-500 tabular-nums">
                     {unreadNotifications}
                   </span>
-                )}
+                ) : isStaff && !previewAsStudent && effStatus !== 'enabled' ? (
+                  <span className="font-mono text-[10px] uppercase text-amber-500">
+                    {effStatus === 'coming_soon' ? 'soon' : effStatus === 'maintenance' ? 'maint' : 'off'}
+                  </span>
+                ) : null}
               </button>
             );
           })}
@@ -225,21 +246,30 @@ const Shell: React.FC = () => {
               </button>
             </div>
             <nav className="flex-1 overflow-y-auto p-3 space-y-1">
-              {NAV_ITEMS.map((item) => {
+              {visibleNavItems.map((item) => {
                 const Icon = item.icon;
+                const sec = getSection(item.id);
+                const effStatus = getEffectiveSectionStatus(sec);
                 return (
                   <button
                     key={item.id}
                     type="button"
                     onClick={() => navigate(item.id)}
-                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${
+                    className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${
                       active === item.id
                         ? 'bg-emerald-500/15 text-emerald-500'
                         : 'text-slate-600 dark:text-slate-300'
                     }`}
                   >
-                    <Icon className="h-4 w-4" />
-                    <span>{item.label}</span>
+                    <span className="flex items-center gap-3 truncate">
+                      <Icon className="h-4 w-4 shrink-0" />
+                      <span className="truncate">{item.label}</span>
+                    </span>
+                    {isStaff && !previewAsStudent && effStatus !== 'enabled' && (
+                      <span className="font-mono text-[10px] uppercase text-amber-500">
+                        {effStatus === 'coming_soon' ? 'soon' : effStatus === 'maintenance' ? 'maint' : 'off'}
+                      </span>
+                    )}
                   </button>
                 );
               })}
@@ -346,23 +376,52 @@ const Shell: React.FC = () => {
           </div>
         )}
 
+        {previewAsStudent && (
+          <div className="mx-4 mt-4 sm:mx-8 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-2.5 text-xs text-amber-600 dark:text-amber-300">
+            <span>
+              Student Preview Mode is active: disabled, Coming Soon, and Maintenance sections are hidden exactly as students experience them.
+            </span>
+            <button
+              type="button"
+              onClick={() => setPreviewAsStudent(false)}
+              className="rounded-lg border border-amber-500/40 px-2.5 py-1 font-semibold hover:bg-amber-500/20"
+            >
+              Exit Student Preview
+            </button>
+          </div>
+        )}
+
         <main className="flex-1 p-4 sm:p-8 max-w-7xl w-full mx-auto min-w-0 overflow-x-hidden">
-          {active === 'home' && <HomeDashboard onNavigate={navigate} />}
-          {active === 'academy' && <LearningAcademy />}
-          {active === 'books' && <BooksLibrary />}
-          {active === 'labs' && <CyberLabs />}
-          {active === 'ctf' && <CtfArena />}
-          {active === 'arena' && <MultiplayerArena />}
-          {active === 'games' && <GamesArenaHub />}
-          {active === 'tournaments' && <TournamentsView />}
-          {active === 'mentor' && <AiCyberMentor />}
-          {active === 'community' && <CommunityView />}
-          {active === 'career' && <CareerHubView />}
-          {active === 'profile' && <ProfileView />}
-          {active === 'notifications' && <NotificationsView />}
-          {active === 'settings' && <SettingsView />}
-          {active === 'legal' && <LegalIpHub initialTab={legalInitialTab} />}
-          {active === 'admin' && <OwnerControlCentre />}
+          {!activeAccess.allowed ? (
+            <SectionUnavailableView
+              sectionName={getUnavailableSectionTitle(active)}
+              status={activeAccess.effectiveStatus}
+              message={activeAccess.reason}
+              onNavigateHome={() => navigate('home')}
+              previewAsStudent={previewAsStudent}
+              onExitPreview={() => setPreviewAsStudent(false)}
+            />
+          ) : (
+            <>
+              {active === 'home' && <HomeDashboard onNavigate={navigate} />}
+              {active === 'academy' && <LearningAcademy />}
+              {active === 'books' && <BooksLibrary />}
+              {active === 'labs' && <CyberLabs />}
+              {active === 'learn-kali' && <LearnKaliFoundation />}
+              {active === 'ctf' && <CtfArena />}
+              {active === 'arena' && <MultiplayerArena />}
+              {active === 'games' && <GamesArenaHub />}
+              {active === 'tournaments' && <TournamentsView />}
+              {active === 'mentor' && <AiCyberMentor />}
+              {active === 'community' && <CommunityView />}
+              {active === 'career' && <CareerHubView />}
+              {active === 'profile' && <ProfileView />}
+              {active === 'notifications' && <NotificationsView />}
+              {active === 'settings' && <SettingsView />}
+              {active === 'legal' && <LegalIpHub initialTab={legalInitialTab} />}
+              {active === 'admin' && <OwnerControlCentre />}
+            </>
+          )}
         </main>
 
         <footer className="border-t border-slate-200 dark:border-slate-800/80 px-4 sm:px-8 py-4 text-xs text-slate-500 dark:text-slate-400 flex flex-wrap items-center justify-between gap-3">
@@ -399,7 +458,9 @@ const Shell: React.FC = () => {
 export default function App() {
   return (
     <AuthProvider>
-      <Shell />
+      <SectionProvider>
+        <Shell />
+      </SectionProvider>
     </AuthProvider>
   );
 }
