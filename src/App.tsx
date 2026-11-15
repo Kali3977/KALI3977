@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Bell,
   BookOpen,
@@ -43,6 +43,7 @@ import { OwnerControlCentre } from './components/OwnerControlCentre';
 import { BrandMark } from './components/BrandMark';
 import { LegalIpHub } from './components/LegalIpHub';
 import { KALI3977_COPYRIGHT_NOTICE } from './lib/domain/anti-abuse';
+import { parseNavSectionFromHash } from './lib/auth-helpers';
 
 const NAV_ITEMS: Array<{ id: NavSection; label: string; icon: React.ComponentType<{ className?: string }> }> = [
   { id: 'home', label: 'Home', icon: Home },
@@ -76,15 +77,36 @@ const Shell: React.FC = () => {
     loginWithGoogle,
     logout,
   } = useAuth();
-  const [active, setActive] = useState<NavSection>('home');
+  const [active, setActive] = useState<NavSection>(() => {
+    if (typeof window === 'undefined') return 'home';
+    return parseNavSectionFromHash(window.location.hash) ?? 'home';
+  });
   const [legalInitialTab, setLegalInitialTab] = useState<'copyright' | 'terms' | 'privacy' | 'aup' | 'report'>('copyright');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const isStaff = Boolean(user && ['owner', 'event_admin', 'moderator'].includes(user.role));
 
+  useEffect(() => {
+    const syncFromHash = () => {
+      const parsed = parseNavSectionFromHash(window.location.hash);
+      if (parsed) {
+        setActive(parsed);
+      }
+    };
+    window.addEventListener('hashchange', syncFromHash);
+    window.addEventListener('popstate', syncFromHash);
+    return () => {
+      window.removeEventListener('hashchange', syncFromHash);
+      window.removeEventListener('popstate', syncFromHash);
+    };
+  }, []);
+
   const navigate = (section: NavSection) => {
     setActive(section);
     setMobileMenuOpen(false);
+    if (typeof window !== 'undefined' && window.location.hash !== `#${section}`) {
+      window.history.replaceState(null, '', `#${section}`);
+    }
   };
 
   const openLegalTab = (tab: 'copyright' | 'terms' | 'privacy' | 'aup' | 'report') => {

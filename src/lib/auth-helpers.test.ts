@@ -4,7 +4,13 @@ import {
   extractFirebaseAuthCode,
   formatFirebaseAuthError,
   isMobileUserAgent,
+  isSameOriginAuthProxyActive,
+  parseNavSectionFromHash,
+  parsePendingRedirectRecord,
+  REDIRECT_PENDING_TTL_MS,
+  resolveFirebaseAuthDomain,
   selectGoogleAuthStrategy,
+  serializePendingRedirectRecord,
 } from './auth-helpers.ts';
 
 test('selectGoogleAuthStrategy picks popup on desktop and inside iframes, redirect on top-level mobile', () => {
@@ -36,6 +42,103 @@ test('selectGoogleAuthStrategy picks popup on desktop and inside iframes, redire
   );
 });
 
+test('resolveFirebaseAuthDomain uses same-origin host on HTTPS non-localhost deployments', () => {
+  const fallback = 'pacific-quill-c83d0.firebaseapp.com';
+
+  const devHost = 'ais-dev-yzrsbqxvfpod2bdrnylest-57074968653.asia-east1.run.app';
+  const resolvedDev = resolveFirebaseAuthDomain({
+    protocol: 'https:',
+    host: devHost,
+    hostname: devHost,
+    fallbackAuthDomain: fallback,
+  });
+  assert.equal(resolvedDev, devHost);
+  assert.equal(
+    isSameOriginAuthProxyActive({
+      protocol: 'https:',
+      host: devHost,
+      hostname: devHost,
+      resolvedAuthDomain: resolvedDev,
+    }),
+    true,
+  );
+
+  const preHost = 'ais-pre-yzrsbqxvfpod2bdrnylest-57074968653.asia-east1.run.app';
+  assert.equal(
+    resolveFirebaseAuthDomain({
+      protocol: 'https:',
+      host: preHost,
+      hostname: preHost,
+      fallbackAuthDomain: fallback,
+    }),
+    preHost,
+  );
+
+  const localResolved = resolveFirebaseAuthDomain({
+    protocol: 'http:',
+    host: 'localhost:3000',
+    hostname: 'localhost',
+    fallbackAuthDomain: fallback,
+  });
+  assert.equal(localResolved, fallback);
+  assert.equal(
+    isSameOriginAuthProxyActive({
+      protocol: 'http:',
+      host: 'localhost:3000',
+      hostname: 'localhost',
+      resolvedAuthDomain: localResolved,
+    }),
+    false,
+  );
+
+  assert.equal(
+    resolveFirebaseAuthDomain({
+      protocol: 'https:',
+      host: fallback,
+      hostname: fallback,
+      fallbackAuthDomain: fallback,
+    }),
+    fallback,
+  );
+});
+
+test('parsePendingRedirectRecord handles JSON records, legacy timestamps, and TTL expiration', () => {
+  const now = 1_700_000_000_000;
+  const serialized = serializePendingRedirectRecord({
+    startedAt: now - 5_000,
+    strategy: 'redirect',
+    returnSection: 'games',
+  });
+
+  assert.deepEqual(parsePendingRedirectRecord(serialized, now), {
+    startedAt: now - 5_000,
+    strategy: 'redirect',
+    returnSection: 'games',
+  });
+
+  // Expired record
+  const expired = serializePendingRedirectRecord({
+    startedAt: now - REDIRECT_PENDING_TTL_MS - 1,
+    strategy: 'redirect',
+    returnSection: 'mentor',
+  });
+  assert.equal(parsePendingRedirectRecord(expired, now), null);
+
+  // Legacy numeric timestamp
+  assert.deepEqual(parsePendingRedirectRecord(String(now - 1000), now), {
+    startedAt: now - 1000,
+    strategy: 'redirect',
+  });
+  assert.equal(parsePendingRedirectRecord('not-valid-json', now), null);
+});
+
+test('parseNavSectionFromHash extracts valid sections safely', () => {
+  assert.equal(parseNavSectionFromHash('#games'), 'games');
+  assert.equal(parseNavSectionFromHash('#/mentor?tab=1'), 'mentor');
+  assert.equal(parseNavSectionFromHash('#unknown-section'), null);
+  assert.equal(parseNavSectionFromHash(''), null);
+});
+
 test('formatFirebaseAuthError maps Firebase error codes accurately without collapsing to popup-closed-by-user', () => {
   const unauthErr = Object.assign(new Error('Firebase: Error (auth/unauthorized-domain).'), {
     code: 'auth/unauthorized-domain',
@@ -58,6 +161,9 @@ test('formatFirebaseAuthError maps Firebase error codes accurately without colla
 
   const opNotAllowed = { code: 'auth/operation-not-allowed' };
   assert.match(formatFirebaseAuthError(opNotAllowed).message, /Sign-in method/);
+
+  const nonceErr = { code: 'auth/missing-or-invalid-nonce' };
+  assert.equal(formatFirebaseAuthError(nonceErr, { isInIframe: false }).canRetryWithRedirect, true);
 
   const customBackendErr = new Error('This account is currently suspended.');
   const backendFormatted = formatFirebaseAuthError(customBackendErr);

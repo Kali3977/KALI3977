@@ -1,3 +1,5 @@
+import type { NavSection } from '../types/kali';
+
 export type GoogleAuthStrategy = 'popup' | 'redirect';
 
 export interface AuthEnvironmentInfo {
@@ -13,6 +15,129 @@ export interface FormattedFirebaseAuthError {
   message: string;
   canRetryWithPopup: boolean;
   canRetryWithRedirect: boolean;
+}
+
+export interface PendingRedirectRecord {
+  startedAt: number;
+  strategy: GoogleAuthStrategy;
+  returnSection?: NavSection;
+}
+
+export const REDIRECT_PENDING_TTL_MS = 15 * 60 * 1000;
+
+export const VALID_NAV_SECTIONS: readonly NavSection[] = [
+  'home',
+  'academy',
+  'books',
+  'labs',
+  'ctf',
+  'arena',
+  'games',
+  'tournaments',
+  'mentor',
+  'community',
+  'career',
+  'profile',
+  'notifications',
+  'settings',
+  'legal',
+  'admin',
+];
+
+export function isValidNavSection(val: string | null | undefined): val is NavSection {
+  return typeof val === 'string' && (VALID_NAV_SECTIONS as readonly string[]).includes(val);
+}
+
+export function parseNavSectionFromHash(hash: string | null | undefined): NavSection | null {
+  if (!hash) return null;
+  const cleaned = hash.replace(/^#\/?/, '').split('?')[0].trim();
+  return isValidNavSection(cleaned) ? cleaned : null;
+}
+
+export function isLocalHostname(hostname: string | undefined | null): boolean {
+  if (!hostname) return true;
+  const lower = hostname.toLowerCase();
+  return (
+    lower === 'localhost' ||
+    lower === '127.0.0.1' ||
+    lower === '0.0.0.0' ||
+    lower === '::1' ||
+    lower === '[::1]'
+  );
+}
+
+/**
+ * Resolves the Firebase authDomain for the current runtime environment.
+ * On HTTPS non-localhost origins (e.g., Cloud Run dev/pre URLs), returns `window.location.host`
+ * so Firebase Auth uses the same-origin `/__/auth/*` reverse proxy and stores OAuth state
+ * in first-party storage instead of cross-site `firebaseapp.com` storage.
+ */
+export function resolveFirebaseAuthDomain(params: {
+  protocol?: string;
+  host?: string;
+  hostname?: string;
+  fallbackAuthDomain: string;
+}): string {
+  const { protocol, host, hostname, fallbackAuthDomain } = params;
+  if (
+    protocol === 'https:' &&
+    host &&
+    !isLocalHostname(hostname) &&
+    !host.endsWith('.firebaseapp.com') &&
+    !host.endsWith('.web.app')
+  ) {
+    return host;
+  }
+  return fallbackAuthDomain;
+}
+
+export function isSameOriginAuthProxyActive(params: {
+  protocol?: string;
+  host?: string;
+  hostname?: string;
+  resolvedAuthDomain: string;
+}): boolean {
+  return (
+    params.protocol === 'https:' &&
+    Boolean(params.host) &&
+    !isLocalHostname(params.hostname) &&
+    params.resolvedAuthDomain === params.host
+  );
+}
+
+export function serializePendingRedirectRecord(record: PendingRedirectRecord): string {
+  return JSON.stringify(record);
+}
+
+export function parsePendingRedirectRecord(
+  raw: string | null | undefined,
+  nowMs: number = Date.now(),
+): PendingRedirectRecord | null {
+  if (!raw) return null;
+  try {
+    // Support legacy timestamp-only string gracefully
+    if (/^\d+$/.test(raw.trim())) {
+      const ts = Number(raw.trim());
+      if (nowMs - ts >= 0 && nowMs - ts <= REDIRECT_PENDING_TTL_MS) {
+        return { startedAt: ts, strategy: 'redirect' };
+      }
+      return null;
+    }
+    const parsed = JSON.parse(raw) as Partial<PendingRedirectRecord>;
+    if (typeof parsed.startedAt !== 'number' || !Number.isFinite(parsed.startedAt)) {
+      return null;
+    }
+    if (nowMs - parsed.startedAt < 0 || nowMs - parsed.startedAt > REDIRECT_PENDING_TTL_MS) {
+      return null;
+    }
+    return {
+      startedAt: parsed.startedAt,
+      strategy: parsed.strategy === 'popup' ? 'popup' : 'redirect',
+      returnSection: isValidNavSection(parsed.returnSection) ? parsed.returnSection : undefined,
+    };
+  } catch {
+    return null;
+  }
 }
 
 export function isMobileUserAgent(userAgent: string, maxTouchPoints = 0): boolean {
@@ -82,7 +207,7 @@ export function formatFirebaseAuthError(
       return {
         code,
         message:
-          'Your browser blocked the Google sign-in popup. Please allow popups for this site or use Redirect Sign-In.',
+          'Your browser blocked the Google sign-in popup. Use Redirect Sign-In or allow popups for this site.',
         canRetryWithPopup: true,
         canRetryWithRedirect: allowRedirectFallback,
       };
@@ -143,14 +268,15 @@ export function formatFirebaseAuthError(
       return {
         code,
         message:
-          'Browser storage or cookies are blocked. Enable site data/cookies to complete Google authentication.',
+          'Browser storage is disabled in this browser context (for example, strict private mode). Open the site in a standard browser tab and try again.',
         canRetryWithPopup: true,
-        canRetryWithRedirect: false,
+        canRetryWithRedirect: allowRedirectFallback,
       };
     case 'auth/redirect-cancelled-by-user':
+    case 'auth/user-cancelled':
       return {
         code,
-        message: 'Google redirect sign-in was cancelled before completion. Please try again.',
+        message: 'Google sign-in was cancelled before completion. Please try again.',
         canRetryWithPopup: true,
         canRetryWithRedirect: allowRedirectFallback,
       };
@@ -160,6 +286,15 @@ export function formatFirebaseAuthError(
         message: 'A Google redirect sign-in is already completing. Please wait a moment.',
         canRetryWithPopup: false,
         canRetryWithRedirect: false,
+      };
+    case 'auth/missing-or-invalid-nonce':
+    case 'auth/no-auth-event':
+      return {
+        code,
+        message:
+          'Your Google sign-in session expired or did not match the current window. Please start sign-in again.',
+        canRetryWithPopup: true,
+        canRetryWithRedirect: allowRedirectFallback,
       };
     case 'auth/invalid-api-key':
     case 'auth/app-not-authorized':
@@ -173,7 +308,7 @@ export function formatFirebaseAuthError(
       return {
         code,
         message:
-          'Firebase Authentication returned an internal error. Verify OAuth client and authorized domains in Firebase Console and try again.',
+          'Firebase Authentication returned an internal error. Verify Authorized Domains and OAuth Redirect URIs in Firebase/Cloud Console and try again.',
         canRetryWithPopup: true,
         canRetryWithRedirect: allowRedirectFallback,
       };

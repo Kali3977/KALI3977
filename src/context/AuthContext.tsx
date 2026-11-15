@@ -2,20 +2,73 @@ import React, { createContext, useCallback, useContext, useEffect, useRef, useSt
 import {
   getRedirectResult,
   onAuthStateChanged,
+  onIdTokenChanged,
   signInWithPopup,
   signInWithRedirect,
   signOut,
   type User,
 } from 'firebase/auth';
-import { auth, ensureAuthPersistence, googleAuthProvider } from '../lib/firebase';
+import {
+  auth,
+  ensureAuthPersistence,
+  googleAuthProvider,
+  usingSameOriginAuthProxy,
+} from '../lib/firebase';
 import {
   formatFirebaseAuthError,
+  parseNavSectionFromHash,
+  parsePendingRedirectRecord,
   selectGoogleAuthStrategy,
+  serializePendingRedirectRecord,
   type GoogleAuthStrategy,
+  type PendingRedirectRecord,
 } from '../lib/auth-helpers';
 import type { UserProfile } from '../types/kali';
 
 const REDIRECT_PENDING_KEY = 'kali3977_auth_redirect_pending';
+
+function readPendingRedirectRecord(): PendingRedirectRecord | null {
+  if (typeof window === 'undefined') return null;
+  for (const storage of [window.sessionStorage, window.localStorage]) {
+    try {
+      const parsed = parsePendingRedirectRecord(storage.getItem(REDIRECT_PENDING_KEY));
+      if (parsed) return parsed;
+    } catch {
+      // Ignore storage access restrictions
+    }
+  }
+  return null;
+}
+
+function writePendingRedirectRecord(record: PendingRedirectRecord): void {
+  if (typeof window === 'undefined') return;
+  const serialized = serializePendingRedirectRecord(record);
+  for (const storage of [window.sessionStorage, window.localStorage]) {
+    try {
+      storage.setItem(REDIRECT_PENDING_KEY, serialized);
+    } catch {
+      // Ignore storage quota / private mode restrictions
+    }
+  }
+}
+
+function clearPendingRedirectRecord(): void {
+  if (typeof window === 'undefined') return;
+  for (const storage of [window.sessionStorage, window.localStorage]) {
+    try {
+      storage.removeItem(REDIRECT_PENDING_KEY);
+    } catch {
+      // Ignore storage restrictions
+    }
+  }
+}
+
+function restoreReturnSection(record: PendingRedirectRecord | null): void {
+  if (typeof window === 'undefined' || !record?.returnSection) return;
+  const current = parseNavSectionFromHash(window.location.hash);
+  if (current === record.returnSection) return;
+  window.location.hash = `#${record.returnSection}`;
+}
 
 interface Membership {
   teamId: number;
@@ -216,50 +269,76 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     let active = true;
-    let unsub: (() => void) | undefined;
+    let unsubAuth: (() => void) | undefined;
+    let unsubToken: (() => void) | undefined;
+
+    const handlePageShow = (evt: PageTransitionEvent) => {
+      if (!evt.persisted) return;
+      // Mobile browser restored page from bfcache after redirect or Back navigation
+      authInFlightRef.current = false;
+      setAuthPending(false);
+      clearPendingRedirectRecord();
+      if (auth.currentUser) {
+        void refreshProfile();
+      }
+    };
+
+    window.addEventListener('pageshow', handlePageShow);
 
     const initAuth = async () => {
       try {
         await ensureAuthPersistence();
 
-        let redirectPending = false;
-        try {
-          redirectPending = Boolean(window.sessionStorage.getItem(REDIRECT_PENDING_KEY));
-        } catch {
-          redirectPending = false;
-        }
+        const pendingRedirect = readPendingRedirectRecord();
+        clearPendingRedirectRecord();
 
         try {
           const redirectResult = await getRedirectResult(auth);
-          try {
-            window.sessionStorage.removeItem(REDIRECT_PENDING_KEY);
-          } catch {
-            // Ignore sessionStorage restrictions
-          }
 
           if (redirectResult?.user) {
             tokenRef.current = await redirectResult.user.getIdToken();
+            restoreReturnSection(pendingRedirect);
             if (active) {
               setFirebaseUser(redirectResult.user);
               clearAuthError();
             }
-          } else if (redirectPending) {
+          } else if (pendingRedirect) {
             await auth.authStateReady();
-            if (active && !auth.currentUser) {
-              setAuthErrorCode('auth/redirect-storage-partitioned');
-              setAuthError(
-                'Mobile redirect sign-in returned without an active session because your browser blocked cross-site auth storage. Try Popup Sign-In or allow cookies for Firebase auth.',
-              );
-              setCanRetryWithPopup(true);
-              setCanRetryWithRedirect(false);
+            if (active && auth.currentUser) {
+              tokenRef.current = await auth.currentUser.getIdToken();
+              restoreReturnSection(pendingRedirect);
+              clearAuthError();
+            } else if (active && !auth.currentUser) {
+              const urlParams = new URLSearchParams(window.location.search);
+              const oauthErr = urlParams.get('error');
+              const isInIframe = detectIframe();
+              if (oauthErr === 'access_denied') {
+                const formatted = formatFirebaseAuthError(
+                  { code: 'auth/redirect-cancelled-by-user' },
+                  { currentHost: window.location.hostname, method: 'redirect', isInIframe },
+                );
+                setAuthErrorCode(formatted.code);
+                setAuthError(formatted.message);
+                setCanRetryWithPopup(formatted.canRetryWithPopup);
+                setCanRetryWithRedirect(formatted.canRetryWithRedirect);
+              } else if (usingSameOriginAuthProxy) {
+                setAuthErrorCode('auth/redirect-cancelled-by-user');
+                setAuthError(
+                  'Google redirect sign-in returned without an active session. If you cancelled or navigated back, please try again or use Popup Sign-In.',
+                );
+                setCanRetryWithPopup(true);
+                setCanRetryWithRedirect(!isInIframe);
+              } else {
+                setAuthErrorCode('auth/redirect-storage-partitioned');
+                setAuthError(
+                  'Redirect sign-in returned without an active session on this browser origin. Try Popup Sign-In or ensure same-origin HTTPS hosting is active.',
+                );
+                setCanRetryWithPopup(true);
+                setCanRetryWithRedirect(false);
+              }
             }
           }
         } catch (redirectErr) {
-          try {
-            window.sessionStorage.removeItem(REDIRECT_PENDING_KEY);
-          } catch {
-            // Ignore sessionStorage restrictions
-          }
           if (active) {
             const formatted = formatFirebaseAuthError(redirectErr, {
               currentHost: window.location.hostname,
@@ -275,7 +354,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         if (!active) return;
 
-        unsub = onAuthStateChanged(auth, async (fbUser) => {
+        unsubToken = onIdTokenChanged(auth, async (fbUser) => {
+          if (!active) return;
+          if (fbUser) {
+            try {
+              tokenRef.current = await fbUser.getIdToken();
+            } catch {
+              tokenRef.current = null;
+            }
+          } else {
+            tokenRef.current = null;
+          }
+        });
+
+        unsubAuth = onAuthStateChanged(auth, async (fbUser) => {
           if (!active) return;
           setFirebaseUser(fbUser);
           if (fbUser) {
@@ -290,6 +382,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
           await refreshProfile();
           if (active) {
+            authInFlightRef.current = false;
+            setAuthPending(false);
             setLoading(false);
           }
         });
@@ -311,7 +405,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return () => {
       active = false;
-      unsub?.();
+      window.removeEventListener('pageshow', handlePageShow);
+      unsubToken?.();
+      unsubAuth?.();
     };
   }, [clearAuthError, refreshProfile]);
 
@@ -382,11 +478,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await ensureAuthPersistence();
 
         if (strategy === 'redirect') {
-          try {
-            window.sessionStorage.setItem(REDIRECT_PENDING_KEY, String(Date.now()));
-          } catch {
-            // Ignore sessionStorage restrictions
-          }
+          const returnSection =
+            typeof window !== 'undefined'
+              ? parseNavSectionFromHash(window.location.hash) ?? undefined
+              : undefined;
+          writePendingRedirectRecord({
+            startedAt: Date.now(),
+            strategy: 'redirect',
+            returnSection,
+          });
           redirecting = true;
           await signInWithRedirect(auth, googleAuthProvider);
           return;
@@ -398,11 +498,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await refreshProfile();
       } catch (err) {
         redirecting = false;
-        try {
-          window.sessionStorage.removeItem(REDIRECT_PENDING_KEY);
-        } catch {
-          // Ignore sessionStorage restrictions
-        }
+        clearPendingRedirectRecord();
         const formatted = formatFirebaseAuthError(err, {
           currentHost: typeof window !== 'undefined' ? window.location.hostname : undefined,
           method: strategy,

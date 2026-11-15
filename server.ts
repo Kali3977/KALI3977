@@ -5,6 +5,7 @@ import helmet from 'helmet';
 import dotenv from 'dotenv';
 import { createServer as createViteServer } from 'vite';
 import { createApiRouter } from './src/server/routes.ts';
+import { createFirebaseAuthProxyRouter } from './src/server/firebase-auth-proxy.ts';
 import { initRealtimeServer } from './src/server/realtime.ts';
 
 dotenv.config();
@@ -27,6 +28,10 @@ async function startServer() {
       referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
     }),
   );
+
+  // Same-origin Firebase Auth proxy (/__/auth/* and /__/firebase/*) so mobile browsers
+  // keep first-party storage during OAuth redirect and popup flows.
+  app.use(createFirebaseAuthProxyRouter());
 
   app.use('/api', (req, res, next) => {
     res.setHeader('X-KALI3977-Platform', 'KALI3977 Educational Platform');
