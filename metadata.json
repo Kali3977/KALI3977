@@ -1,0 +1,6 @@
+{
+  "name": "KALI3977",
+  "description": "ZERO TO ADVANCED. Independent worldwide cybersecurity learning academy, isolated labs, CTF arena, multiplayer campus competitions, tournaments, and AI Cyber Mentor platform.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

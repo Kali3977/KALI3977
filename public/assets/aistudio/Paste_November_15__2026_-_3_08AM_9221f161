@@ -1,0 +1,1429 @@
+# KALI3977 — MASTER PLATFORM EXPANSION PROMPT
+## Complete Cybersecurity Education, Research, Practical Labs, CTF, Multiplayer Competitions and Administration Ecosystem
+
+Continue developing the EXISTING KALI3977 application.
+
+Do not create a new application. Do not discard the existing project, working components, database, authentication, or routes. Inspect the current application and its architecture before making changes.
+
+Your mission is to transform KALI3977 into a comprehensive, professional, worldwide cybersecurity education and practical training platform.
+
+The platform must serve absolute beginners, university students from first year through fifth year, postgraduate students, experienced cybersecurity professionals, researchers, and experts.
+
+The learning experience must be so extensive that even an advanced learner or experienced professional can discover new subjects, techniques, tools, research, and practical skills.
+
+**Core identity:**
+
+KALI3977
+
+ZERO TO ADVANCED. LEARN. PRACTISE. COMPETE. MASTER.
+
+An independent worldwide cybersecurity education platform. It is not an official Kali Linux product.
+
+---
+
+# 1. CRITICAL DEVELOPMENT INSTRUCTIONS
+
+Before changing anything:
+
+1. Inspect the existing source code and project structure.
+2. Identify the current frontend, backend, database, authentication, and routing architecture.
+3. Identify existing functional features and broken features.
+4. Preserve existing working functionality.
+5. Reuse the existing architecture where practical.
+6. Implement improvements incrementally without unnecessarily replacing working components.
+
+Development rules:
+
+- Build real functionality, not just attractive frontend screens.
+- Every button, link, form, menu, filter, and action must work.
+- Persist important information in the database.
+- Do not use temporary frontend arrays as permanent application data.
+- Do not show fictional live statistics as actual data.
+- Do not create fake verification, scoring, chat, or authentication.
+- Clearly distinguish implemented features from prototypes.
+- Include loading, empty, success, and error states.
+- Support desktop, tablet, and mobile.
+- Maintain the existing professional dark cybersecurity design while improving consistency.
+- Do not expose API keys, credentials, private codes, or administrative operations in frontend code.
+- Do not delete existing functionality without a technical reason.
+
+If the project requires external infrastructure, API keys, deployment configuration, or paid services, identify those dependencies honestly.
+
+Do not claim a feature is complete until its frontend, backend, database operations, and permission checks have been implemented and tested.
+
+# 2. COMPLETE LEARNING ECOSYSTEM — NO LEARNING CEILING
+
+This is one of the most important requirements.
+
+KALI3977 must not be limited to beginner courses or a short eight-stage curriculum.
+
+It must provide an extensive, structured, continuously expandable cybersecurity knowledge ecosystem.
+
+It should accommodate:
+
+- Absolute beginners with zero technical knowledge.
+- First-year BTech/BSc/BCA students.
+- Second-year students.
+- Third-year students.
+- Fourth-year students.
+- Fifth-year integrated degree students.
+- Postgraduate students.
+- Cybersecurity professionals.
+- Experienced engineers.
+- Security researchers.
+- Advanced practitioners and experts.
+
+Do not assume that academic year determines technical knowledge.
+
+A first-year student who already understands Python should be able to progress to advanced Python security. A fifth-year student who does not understand networking should be able to learn networking from the beginning.
+
+## 2.1 Adaptive Learning Levels
+
+Every learning path should support:
+
+1. Absolute Beginner
+2. Beginner
+3. Elementary
+4. Intermediate
+5. Upper Intermediate
+6. Advanced
+7. Expert
+8. Research and Specialist Level
+
+Each course should have prerequisites, learning objectives, estimated difficulty, and knowledge assessments.
+
+Provide optional foundational refreshers so experienced learners can skip material they already understand.
+
+Do not make advanced material inaccessible merely because a learner has not completed an arbitrary number of beginner courses. Use appropriate prerequisite checks.
+
+## 2.2 Extensive Curriculum
+
+Build a large curriculum containing multiple subjects, courses, modules, lessons, practical exercises, and specialist tracks.
+
+The following is a minimum subject map, not a limit on future content.
+
+### A. Computer Science and Computing Foundations
+
+- Computer architecture.
+- CPU architecture and instruction execution.
+- Registers, memory, cache, and storage.
+- Binary, hexadecimal, and number systems.
+- Operating systems.
+- Processes and threads.
+- Memory management.
+- File systems.
+- Data representation.
+- Virtualization.
+- Computer organization.
+- Data structures.
+- Algorithms.
+- Computational complexity.
+- Discrete mathematics.
+- Boolean algebra.
+- Digital logic.
+- Computer organization and architecture.
+- Software engineering fundamentals.
+
+### B. Linux and Operating Systems
+
+- Linux from zero.
+- Linux distributions.
+- Filesystem hierarchy.
+- Shell and terminal.
+- Bash scripting.
+- Users and groups.
+- Permissions and ACLs.
+- Processes and services.
+- Package management.
+- System administration.
+- Linux networking.
+- Linux kernel fundamentals.
+- System calls.
+- Linux security and hardening.
+- Kali Linux.
+- Ubuntu, Debian, Fedora, Arch, and other distributions.
+- Windows fundamentals.
+- Windows internals.
+- PowerShell.
+- Windows registry.
+- NTFS.
+- Event logging.
+- Windows security.
+- Active Directory.
+- Group Policy.
+- Windows administration.
+- macOS fundamentals.
+- UNIX internals.
+
+### C. Networking
+
+- Networking fundamentals.
+- OSI model.
+- TCP/IP model.
+- Ethernet.
+- MAC addressing.
+- IPv4 and IPv6.
+- Subnetting.
+- Routing and switching.
+- VLANs.
+- DNS.
+- DHCP.
+- ARP.
+- ICMP.
+- TCP and UDP.
+- HTTP and HTTPS.
+- TLS and SSL.
+- SMTP, FTP, SSH, and other protocols.
+- Firewalls.
+- Proxies.
+- VPNs.
+- Network architecture.
+- Wireless networking.
+- Network monitoring.
+- Wireshark.
+- Packet analysis.
+- Network troubleshooting.
+- Network defence.
+- Network security architecture.
+
+### D. Programming and Software Development
+
+Teach programming from absolute beginner to advanced level.
+
+Include:
+
+- Python.
+- C.
+- C++.
+- Java.
+- JavaScript.
+- TypeScript.
+- Go.
+- Rust.
+- PHP.
+- SQL.
+- Bash.
+- PowerShell.
+- HTML and CSS.
+- Assembly language.
+
+Also include:
+
+- Object-oriented programming.
+- Functional programming.
+- Data structures and algorithms.
+- Git and GitHub.
+- APIs.
+- Databases.
+- Backend development.
+- Frontend development.
+- Secure software development.
+- Code review.
+- Software testing.
+- Debugging.
+- Automation.
+- Scripting for security professionals.
+
+### E. Cybersecurity Fundamentals
+
+- Information security.
+- CIA triad.
+- Security architecture.
+- Authentication.
+- Authorization.
+- Access control.
+- Cryptography.
+- Encryption and decryption.
+- Hashing.
+- Digital signatures.
+- Certificates.
+- PKI.
+- Identity management.
+- Vulnerability management.
+- Threat modeling.
+- Risk management.
+- Security frameworks.
+- Security policies.
+- Security awareness.
+- Security governance.
+
+### F. Ethical Hacking and Penetration Testing
+
+- Ethical hacking fundamentals.
+- Reconnaissance.
+- OSINT.
+- Scanning.
+- Enumeration.
+- Vulnerability assessment.
+- Penetration testing methodology.
+- Nmap.
+- Burp Suite.
+- Metasploit in authorized labs.
+- Web application security.
+- API security.
+- Authentication testing.
+- Session management.
+- SQL injection.
+- XSS.
+- CSRF.
+- SSRF.
+- File inclusion.
+- Access control vulnerabilities.
+- OWASP Top 10.
+- Privilege escalation in controlled environments.
+- Active Directory security testing.
+- Wireless security testing.
+- Cloud penetration testing.
+- Reporting and remediation.
+
+### G. Blue Team and SOC
+
+- SOC fundamentals.
+- Security monitoring.
+- SIEM.
+- Log analysis.
+- Alert triage.
+- Incident response.
+- Threat intelligence.
+- Threat hunting.
+- Detection engineering.
+- Sigma.
+- YARA.
+- Endpoint security.
+- EDR and XDR concepts.
+- Network detection.
+- Security automation.
+- MITRE ATT&CK.
+- Defensive architecture.
+- Security operations.
+- Incident investigation.
+
+### H. Digital Forensics
+
+- Digital forensics fundamentals.
+- Evidence acquisition.
+- Disk imaging.
+- File system forensics.
+- Memory forensics.
+- Network forensics.
+- Browser forensics.
+- Email forensics.
+- Mobile forensics.
+- Windows forensics.
+- Linux forensics.
+- Timeline analysis.
+- Metadata analysis.
+- Deleted file recovery.
+- Evidence preservation.
+- Chain of custody.
+- Forensic reporting.
+- Incident reconstruction.
+
+### I. Malware Analysis and Reverse Engineering
+
+- Malware fundamentals.
+- Executable formats.
+- PE and ELF analysis.
+- Static analysis.
+- Dynamic analysis.
+- Debugging.
+- Assembly.
+- Reverse engineering.
+- Malware behaviour.
+- Sandboxing.
+- Memory analysis.
+- Malware classification.
+- Detection engineering.
+- YARA rules.
+- Safe malware research environments.
+
+### J. Cryptography
+
+- Mathematical foundations.
+- Classical cryptography.
+- Symmetric encryption.
+- Asymmetric encryption.
+- AES.
+- RSA.
+- ECC.
+- Hash functions.
+- HMAC.
+- Digital signatures.
+- Key exchange.
+- TLS.
+- Cryptographic implementation errors.
+- Cryptanalysis.
+- Applied cryptography.
+- Post-quantum cryptography.
+
+### K. Advanced and Emerging Technologies
+
+- Cloud security.
+- AWS security.
+- Azure security.
+- Google Cloud security.
+- Container security.
+- Docker security.
+- Kubernetes security.
+- DevSecOps.
+- CI/CD security.
+- Software supply-chain security.
+- IoT security.
+- Embedded systems security.
+- Hardware security.
+- Firmware analysis.
+- Mobile security.
+- Android security.
+- iOS security.
+- Wireless security.
+- 5G security.
+- Blockchain security.
+- Smart contract security.
+- AI security.
+- Machine learning security.
+- LLM security.
+- Adversarial machine learning.
+- Privacy engineering.
+- Quantum computing security.
+- Post-quantum security.
+
+### L. Advanced Research and Specialist Topics
+
+Include specialist-level learning material such as:
+
+- Binary exploitation.
+- Memory corruption.
+- Stack and heap internals.
+- Fuzzing.
+- Exploit mitigation.
+- Reverse engineering.
+- Vulnerability research.
+- Secure compiler design.
+- Kernel security.
+- Hypervisor security.
+- Browser security architecture.
+- Protocol security.
+- Advanced cryptanalysis.
+- Formal verification.
+- Side-channel analysis.
+- Hardware attack research in controlled environments.
+- Advanced threat hunting.
+- Advanced malware research.
+- Security architecture research.
+- AI model security.
+- Emerging vulnerability research.
+- Academic cybersecurity research methods.
+
+### M. Professional Career Specializations
+
+Create complete specialist learning paths for:
+
+- Penetration Tester.
+- Red Team Operator.
+- Blue Team Analyst.
+- SOC Analyst.
+- Security Engineer.
+- Security Architect.
+- Application Security Engineer.
+- Cloud Security Engineer.
+- Digital Forensics Investigator.
+- Malware Analyst.
+- Reverse Engineer.
+- Threat Hunter.
+- Incident Responder.
+- Vulnerability Researcher.
+- Security Researcher.
+- GRC Specialist.
+- DevSecOps Engineer.
+- AI Security Researcher.
+
+Each path should contain required skills, prerequisite courses, projects, labs, assessments, and career preparation.
+
+## 2.3 Depth and Quality Requirements
+
+Do not create courses that only contain headings and a few paragraphs.
+
+Every meaningful course should include:
+
+- Full course description.
+- Learning objectives.
+- Prerequisites.
+- Detailed modules.
+- Detailed lessons.
+- Technical explanations.
+- Examples.
+- Diagrams where useful.
+- Practical command demonstrations.
+- Code examples where appropriate.
+- Exercises.
+- Knowledge assessments.
+- Quizzes.
+- Practical labs.
+- Projects.
+- Case studies.
+- Revision material.
+- Further reading.
+- References.
+- Completion tracking.
+
+For advanced subjects, include research papers, technical documentation, implementation details, real-world case studies, and deeper technical analysis.
+
+Use books and official documentation as references. Respect copyright and licensing.
+
+## 2.4 Knowledge Assessment and Personalization
+
+Implement:
+
+- Initial skill assessment.
+- Subject-specific diagnostic tests.
+- Adaptive recommendations.
+- Knowledge gap identification.
+- Prerequisite checks.
+- Personalized learning paths.
+- Revision recommendations.
+- Progress tracking.
+- Skill proficiency indicators.
+
+Let users skip known material through appropriate assessments.
+
+# 3. BOOKS AND KNOWLEDGE LIBRARY
+
+Add a dedicated Books section in the sidebar.
+
+Create a searchable, organized cybersecurity and computer science library.
+
+Categories:
+
+- Computer Science.
+- Computer Architecture.
+- Operating Systems.
+- Linux.
+- Windows.
+- Networking.
+- Programming.
+- Python.
+- C and C++.
+- Cybersecurity Fundamentals.
+- Ethical Hacking.
+- Web Security.
+- Cryptography.
+- Digital Forensics.
+- Malware Analysis.
+- Reverse Engineering.
+- Cloud Security.
+- SOC and Incident Response.
+- AI Security.
+- Academic Research.
+- Advanced Security.
+
+Every book listing should support:
+
+- Cover image.
+- Title.
+- Author.
+- Description.
+- Category.
+- Difficulty.
+- Language.
+- Publication details.
+- Licence.
+- Free or paid availability.
+- Official source.
+- Read Online.
+- Download, only when redistribution is permitted.
+- Bookmark.
+- Personal reading list.
+- Reading progress.
+
+Provide a reading interface for books that can legally be displayed.
+
+Use open-access books, public-domain material, official documentation, and legally reusable resources.
+
+Include resources such as The Linux Command Line, Pro Git, GNU manuals, official vendor documentation, and other legitimate educational material.
+
+For copyrighted books, provide metadata and links to authorized publishers or reading platforms. Do not pirate or redistribute copyrighted PDFs.
+
+Admins must be able to add, edit, approve, archive, and remove book listings.
+
+# 4. CTF ARENA — LARGE AND EXPANDABLE CHALLENGE LIBRARY
+
+Create a large, scalable CTF challenge ecosystem.
+
+Categories:
+
+- Web Exploitation.
+- Cryptography.
+- Digital Forensics.
+- OSINT.
+- Reverse Engineering.
+- Binary Exploitation.
+- Steganography.
+- Linux.
+- Windows.
+- Networking.
+- Malware Analysis.
+- API Security.
+- Cloud Security.
+- Miscellaneous.
+
+Difficulty levels:
+
+- Beginner.
+- Easy.
+- Medium.
+- Hard.
+- Expert.
+- Research Level.
+
+Start with at least 50 original, properly tested challenges. Build the architecture to support hundreds or thousands of challenges as the collection expands.
+
+Each challenge should have:
+
+- Unique ID.
+- Title.
+- Description.
+- Category.
+- Difficulty.
+- Points.
+- Files or authorized lab target.
+- Hints.
+- Flag format.
+- Server-side flag validation.
+- Explanation.
+- Learning objectives.
+- Completion history.
+- Related courses.
+- Related books or references.
+
+Features:
+
+- Search.
+- Category filters.
+- Difficulty filters.
+- Sorting.
+- Bookmarks.
+- Solved and unsolved status.
+- Personal CTF history.
+- Team CTF history.
+- Leaderboards.
+- Dynamic scoring.
+- Challenge reporting.
+- Admin challenge management.
+
+Do not copy challenge content or flags from other platforms. Create original challenges and properly attribute external resources.
+
+## 4.1 Fix CTF Links
+
+The existing application has CTF links that are not clickable.
+
+Inspect and fix every intended link.
+
+- Use functional anchors or proper application routing.
+- Internal links must open the correct challenge.
+- External links must open the correct destination.
+- External links should use safe new-tab behaviour and appropriate security attributes.
+- Validate URLs.
+- Make links visually identifiable.
+- Support keyboard navigation.
+- Show errors for unavailable resources.
+- Never display a fake clickable URL.
+- Test every link.
+
+Add a directory of legitimate external CTF training and competition platforms, clearly distinguished from KALI3977's own challenges.
+
+# 5. USER TYPES AND ROLE-BASED ACCESS CONTROL
+
+Implement a complete server-enforced role system.
+
+Roles:
+
+1. Guest.
+2. Learner.
+3. Team Member.
+4. Team Captain.
+5. Event Organizer.
+6. Moderator.
+7. Admin.
+8. Owner / Super Admin.
+
+Permissions:
+
+**Guest**
+- Explore publicly available content.
+
+**Learner**
+- Access courses, books, labs, CTFs, and personal profile.
+
+**Team Member**
+- Access their own team lobby, team chat, and assigned competitions.
+
+**Team Captain**
+- Manage permitted team activities and membership requests.
+
+**Event Organizer**
+- Manage assigned competition events.
+
+**Moderator**
+- Review reports and moderate assigned community spaces.
+
+**Admin**
+- Manage users, teams, codes, rooms, permissions, rules, content, and other authorized platform operations.
+
+**Owner**
+- Has the highest platform authority.
+
+Do not rely on frontend visibility to enforce permissions. Every privileged backend action must independently check authorization.
+
+# 6. OWNER ACCOUNT AND ADMINISTRATION
+
+Configure the initial Owner account using this verified email address:
+
+r.7777rb@gmail.com
+
+Use a secure initial owner provisioning process.
+
+Do not grant Owner privileges through a simple frontend email comparison.
+
+Do not invent the owner's personal name. Provide an Owner Profile setting that can be configured.
+
+The Owner must be able to:
+
+- Appoint administrators.
+- Revoke administrators.
+- Assign restricted admin permissions.
+- Review administrative activity.
+- Configure platform settings.
+- Manage all teams.
+- Manage all campuses.
+- Manage all competition rooms.
+- Manage users.
+- Manage courses and books.
+- Manage CTFs and labs.
+- Configure security policies.
+- Configure AI usage.
+- Manage certificates.
+- Access security and audit dashboards.
+- Suspend or ban users.
+- Terminate competitions and labs.
+- Manage all platform content.
+
+Require MFA and strong authentication for the Owner and privileged administrators.
+
+Only the Owner can appoint or revoke administrators.
+
+# 7. COMPLETE ADMIN PANEL
+
+Add a dedicated Admin Panel to the sidebar for authorized users.
+
+Create these sections.
+
+## 7.1 Admin Dashboard
+
+Display actual database-backed information:
+
+- Registered users.
+- Active users.
+- Suspended users.
+- Banned users.
+- Teams.
+- Campuses.
+- Active rooms.
+- Competitions.
+- Courses.
+- Books.
+- CTF challenges.
+- CTF participation.
+- Recent security events.
+- Recent administrative actions.
+
+## 7.2 User Management
+
+Admins with appropriate permissions can:
+
+- Search users.
+- Filter users.
+- View profiles.
+- View role.
+- View campus.
+- View team membership.
+- View competition history.
+- Temporarily suspend accounts.
+- Permanently ban accounts.
+- Restore accounts.
+- Revoke sessions.
+- Change permitted roles.
+- Record disciplinary reasons.
+- Review previous actions.
+
+## 7.3 Team Management
+
+Create a complete Teams Management section.
+
+Authorized administrators can:
+
+- Create teams.
+- Delete teams.
+- Edit team names.
+- Edit team descriptions.
+- Assign campuses.
+- Add and remove members.
+- Assign and remove captains.
+- Change capacity.
+- View member lists.
+- View team scores.
+- View rankings.
+- View competition history.
+- View associated rooms.
+- View Team Codes.
+- Rotate or revoke Team Codes.
+- Change team permissions.
+- Temporarily remove members.
+- Permanently remove members.
+
+Each team detail page must show:
+
+- Team name.
+- Campus.
+- Team ID.
+- Team Code, restricted to authorized administrators.
+- Member count.
+- Maximum capacity.
+- Team captain.
+- Team members.
+- Individual scores.
+- Team score.
+- Competition history.
+- Associated Room Codes.
+- Team status.
+- Creation date.
+- Recent activity.
+
+## 7.4 Room Management
+
+Authorized administrators can:
+
+- Create rooms.
+- Edit rooms.
+- Pause rooms.
+- Resume rooms.
+- Terminate rooms.
+- View Room Codes.
+- View associated teams.
+- View associated Team Codes.
+- Configure room capacity.
+- Configure per-team capacity.
+- Configure competition times.
+- Change game modes.
+- Change scoring rules.
+- Configure joining permissions.
+- Set code expiry.
+- Rotate codes.
+- Revoke codes.
+- Remove participants.
+- Review room activity.
+
+## 7.5 Permissions and Rules
+
+Allow the Owner and appropriately authorized administrators to configure:
+
+- Who can create teams.
+- Who can create rooms.
+- Who can join private rooms.
+- Who can invite team members.
+- Who can access team chat.
+- Who can view scores.
+- Who can manage memberships.
+- Who can change competition rules.
+- Who can access administrative information.
+
+All permission changes must be enforced server-side and logged.
+
+## 7.6 Content Management
+
+Admins must be able to manage:
+
+- Courses.
+- Lessons.
+- Learning paths.
+- CTF challenges.
+- Flags.
+- Hints.
+- Explanations.
+- Labs.
+- Books.
+- Resources.
+- Community categories.
+- Events.
+- Certificates.
+
+## 7.7 Administrative Audit Logs
+
+Record:
+
+- Administrator identity.
+- Action.
+- Target resource.
+- Timestamp.
+- Previous value.
+- New value.
+- Reason.
+- Relevant security context.
+
+Logs must be protected against ordinary administrators modifying or deleting their own activity records.
+
+# 8. FIVE INITIAL NFSU CAMPUSES
+
+Preload exactly these five campuses:
+
+1. NFSU Gandhinagar.
+2. NFSU Delhi.
+3. NFSU Tripura.
+4. NFSU Dharwad.
+5. NFSU Guwahati.
+
+Do not preload fictional teams from IIT Delhi, NUS, ETH Zurich, MIT, Oxford, or unrelated institutions.
+
+Each campus should have:
+
+- Campus ID.
+- Campus name.
+- Team name.
+- Team Code.
+- Team captain.
+- Members.
+- Capacity.
+- Score.
+- Competition history.
+- Status.
+
+Initial suggested capacity: 30 members per campus team.
+
+Allow authorized administrators to change capacity and add new institutions later.
+
+Do not automatically add other universities.
+
+# 9. TWO-CODE COMPETITION SYSTEM
+
+There must be TWO DIFFERENT CODES.
+
+**ROOM CODE**
+
+Identifies a competition room.
+
+**TEAM CODE**
+
+Identifies a campus team.
+
+Example:
+
+Competition Room Code: 3977-CTF-82A
+
+Campus Team Codes:
+
+- Gandhinagar: CAMPUS-001
+- Delhi: CAMPUS-002
+- Tripura: CAMPUS-003
+- Dharwad: CAMPUS-004
+- Guwahati: CAMPUS-005
+
+These are examples only. Generate secure, unique codes for actual use.
+
+Joining process:
+
+1. User logs in.
+2. User selects Join Competition.
+3. User enters Room Code.
+4. User enters Team Code.
+5. Backend validates both codes.
+6. Backend checks eligibility, expiry, room status, team status, and capacity.
+7. User enters the correct team lobby.
+
+Support:
+
+- Multiple teams in one room.
+- Multiple competitions.
+- Individual scoring.
+- Team scoring.
+- Live campus rankings.
+- Team member lists.
+- Team captain.
+- Configurable capacity.
+- Code rotation.
+- Code expiry.
+- Code revocation.
+- Competition history.
+
+Prevent duplicate participation, unauthorized team switching, and use of expired codes.
+
+Do not assume a shared Team Code proves campus identity. Provide configurable verification, such as invitation approval, roster approval, institutional email, or organizer approval.
+
+A shared campus Team Code may be supported, but it must be combined with appropriate eligibility controls.
+
+# 10. TEAM CHAT AND COMMUNICATION
+
+Add real-time private Team Chat.
+
+Features:
+
+- Text messages.
+- Timestamps.
+- Sender identity.
+- Online status where available.
+- Message history.
+- Unread indicators.
+- Team announcements.
+- Pinned messages.
+- Replies.
+- Message reporting.
+- Authorized moderation.
+- Captain announcements.
+- Notifications.
+
+Only authorized current team members and personnel with explicit permissions may access private team conversations.
+
+Prevent cross-team message access.
+
+Add a separate competition-wide announcement channel controlled by event organizers.
+
+Use secure server-side authorization for every chat operation.
+
+# 11. TEMPORARY AND PERMANENT REMOVAL SYSTEM
+
+Authorized administrators must be able to:
+
+- Temporarily suspend a platform account.
+- Permanently ban a platform account.
+- Temporarily remove a user from a team.
+- Permanently remove a user from a team.
+- Remove a participant from a particular competition room.
+- Revoke active sessions.
+
+Every disciplinary action must require a reason and create an audit record.
+
+Clearly distinguish:
+
+- Platform suspension.
+- Platform ban.
+- Team removal.
+- Competition removal.
+
+Removing someone from one team must not automatically ban them from the whole platform.
+
+Provide an appropriate appeal or review mechanism.
+
+# 12. USER TRANSPARENCY AND ADMIN ACCESS DISCLAIMER
+
+Display the following notice during registration and in relevant team, competition, and account settings pages.
+
+"KALI3977 ADMINISTRATION AND SECURITY NOTICE
+
+KALI3977 administrators may access team and competition management information, including Room Codes, Team Codes, membership records, and relevant activity logs, when required for platform administration, security investigations, competition management, or suspected suspicious activity.
+
+Authorized administrators may change, rotate, or revoke codes and permissions.
+
+Where necessary under platform rules, authorized administrators may temporarily suspend or permanently ban accounts, temporarily or permanently remove users from teams, or remove participants from competition rooms.
+
+Administrative actions may be logged and reviewed. Disciplinary actions should include a recorded reason and follow the platform's published rules and applicable appeal process.
+
+Private team conversations are accessible only to authorized participants and personnel with explicitly assigned moderation or security permissions. Such access must be restricted, justified, and audited.
+
+By using KALI3977, users agree to follow its Terms of Service, Competition Rules, Community Guidelines, and Security Policies."
+
+Require users to acknowledge relevant policies during registration and before joining competitions.
+
+# 13. MULTIPLAYER ARENA AND TOURNAMENTS
+
+Expand the Multiplayer Arena.
+
+Include:
+
+- Create Room.
+- Join Room.
+- Room Code.
+- Campus Team Code.
+- Team Lobby.
+- Team Chat.
+- Team Members.
+- Team Captain.
+- Individual Score.
+- Team Score.
+- Live Scoreboard.
+- Competition Timer.
+- Challenge Progress.
+- Team Announcements.
+- Competition History.
+
+Support these competition formats:
+
+1. CTF Battle.
+2. Red vs Blue.
+3. Cyber Investigation.
+4. Cyber Rush.
+5. SOC Incident Response.
+6. Network Defence.
+7. Digital Forensics Challenge.
+8. Cryptography Battle.
+9. Custom Cyber Games.
+
+Organizers should be able to configure:
+
+- Competition title.
+- Game mode.
+- Difficulty.
+- Number of teams.
+- Participating campuses.
+- Team capacity.
+- Overall capacity.
+- Start and end times.
+- Scoring rules.
+- Challenges.
+- Registration limits.
+- Joining rules.
+- Moderators.
+- Public or private status.
+
+Support at least 150 participants in one competition, with configurable capacity beyond that.
+
+Use server-authoritative scoring and flag verification.
+
+# 14. CYBER LABS
+
+Improve the existing Cyber Labs section.
+
+Provide practical, guided labs for:
+
+- Linux.
+- Networking.
+- Web Security.
+- Cryptography.
+- Digital Forensics.
+- Windows.
+- Active Directory.
+- Reverse Engineering.
+- Malware Analysis.
+- Cloud Security.
+- SOC.
+- Incident Response.
+
+Each lab should include:
+
+- Objectives.
+- Prerequisites.
+- Instructions.
+- Environment requirements.
+- Hints.
+- Reset functionality.
+- Verification.
+- Completion status.
+- Learning explanation.
+
+Security requirements:
+
+- Never execute arbitrary user code in the production backend.
+- Use isolated disposable environments for practical execution.
+- Prevent cross-user access.
+- Restrict outbound networking.
+- Restrict CPU, memory, storage, and execution time.
+- Prevent access to production databases and secrets.
+- Clean up lab resources after use.
+- Use stronger isolation, such as disposable microVMs, for high-risk workloads.
+
+Do not claim a lab is isolated unless the infrastructure actually provides the required isolation.
+
+# 15. AI CYBER MENTOR
+
+Improve the existing AI Cyber Mentor.
+
+Capabilities:
+
+- Explain concepts.
+- Teach commands.
+- Debug educational code.
+- Explain errors.
+- Generate quizzes.
+- Create personalized learning paths.
+- Provide hints.
+- Explain CTF solutions after attempts.
+- Review code for security issues.
+- Explain defensive techniques.
+- Help understand research papers.
+- Provide beginner-to-expert explanations.
+- Support English and Hindi.
+- Offer Socratic learning.
+- Offer revision and exam preparation.
+
+Mentorship modes:
+
+- Explain Concept.
+- Teach Step by Step.
+- Give Hints.
+- Quiz Me.
+- Review My Code.
+- Explain My Error.
+- Research Assistant.
+- Career Guidance.
+
+Use server-side API configuration and protect API keys.
+
+Apply ethical and legal restrictions. Keep practical offensive exercises inside authorized training environments.
+
+# 16. COMMUNITY AND CAREER HUB
+
+Improve Community with:
+
+- Topic discussions.
+- Study groups.
+- Team discovery.
+- Team invitations.
+- Questions and answers.
+- Community moderation.
+- Reporting.
+- Weekly challenges.
+- Research sharing.
+- Project showcases.
+
+Improve Career Hub with:
+
+- Career roadmaps.
+- Resume guidance.
+- GitHub portfolio development.
+- Interview preparation.
+- Internship preparation.
+- Project ideas.
+- Certification guidance.
+- Skill gap analysis.
+- Professional learning paths.
+
+Do not guarantee employment, internships, or certifications.
+
+# 17. PERSONAL DASHBOARD AND PROFILE
+
+Display actual user information:
+
+- Learning level.
+- XP.
+- Courses completed.
+- Lessons completed.
+- Labs completed.
+- CTF challenges solved.
+- Individual score.
+- Team score.
+- Competition history.
+- Skills.
+- Skill gaps.
+- Reading progress.
+- Bookmarks.
+- Streaks.
+- Achievements.
+- Certificates.
+- Recommended next activities.
+
+Allow users to configure profile privacy.
+
+# 18. CERTIFICATES AND ACHIEVEMENTS
+
+Implement verifiable certificates for eligible learning paths and competitions.
+
+Include:
+
+- Unique certificate ID.
+- Recipient.
+- Course or event.
+- Issue date.
+- Verification page.
+- Revocation status.
+- Issuer information.
+
+Do not issue certificates merely because a user opens a course.
+
+Use verified completion and assessment criteria.
+
+# 19. SECURITY ARCHITECTURE
+
+Security is a core requirement, not an optional enhancement.
+
+Implement:
+
+- Server-side role-based authorization.
+- Strong authentication.
+- MFA for privileged users.
+- Secure sessions.
+- Input validation.
+- Rate limiting.
+- Login throttling.
+- CSRF protection where applicable.
+- XSS protection.
+- SQL injection protection.
+- Secure database access.
+- Secrets management.
+- Audit logging.
+- Secure file uploads.
+- Chat authorization.
+- Server-side score validation.
+- Server-side flag validation.
+- Lab isolation.
+- Dependency scanning.
+- Security monitoring.
+- Backup and recovery.
+
+Never trust frontend role values, scores, flags, room codes, or permissions.
+
+Do not make claims that the system is unhackable.
+
+# 20. EXISTING INTERFACE REVIEW
+
+Review and improve every existing section:
+
+- Home.
+- Learning Academy.
+- Cyber Labs.
+- CTF Arena.
+- Multiplayer Arena.
+- Tournaments and Events.
+- AI Cyber Mentor.
+- Community.
+- Career Hub.
+- My Profile.
+- Notifications.
+- Settings.
+
+Add:
+
+- Books.
+- Admin Panel.
+
+Correct:
+
+- Broken links.
+- Inconsistent campus names.
+- Fake sample teams.
+- Incorrect statistics.
+- Nonfunctional buttons.
+- Broken navigation.
+- Empty or incomplete states.
+- Mobile layout problems.
+- Permission visibility issues.
+
+Keep the current overall design identity, but improve readability, navigation, accessibility, and consistency.
+
+# 21. DATABASE AND SCALABILITY
+
+Design the data model to support:
+
+- Users.
+- Roles.
+- Permissions.
+- Campuses.
+- Teams.
+- Team memberships.
+- Team invitations.
+- Team codes.
+- Competition rooms.
+- Room codes.
+- Competitions.
+- Participants.
+- Challenges.
+- Flags.
+- Submissions.
+- Scores.
+- Courses.
+- Learning paths.
+- Lessons.
+- Assessments.
+- Books.
+- Reading progress.
+- Labs.
+- Lab sessions.
+- Team messages.
+- Notifications.
+- Reports.
+- Certificates.
+- Audit logs.
+
+Use appropriate indexes, relationships, validation, and transaction handling.
+
+Avoid duplicate or inconsistent records.
+
+Support future growth without requiring the entire platform to be rewritten.
+
+# 22. FINAL TESTING AND VERIFICATION
+
+Before reporting completion, test the following:
+
+1. Registration.
+2. Login.
+3. Role-based access.
+4. Owner access.
+5. Admin access.
+6. Unauthorized admin access rejection.
+7. User management.
+8. Team creation.
+9. Team deletion.
+10. Team member management.
+11. Room creation.
+12. Room Code changes.
+13. Team Code changes.
+14. Code expiry and revocation.
+15. Competition joining.
+16. Team chat privacy.
+17. Temporary removal.
+18. Permanent removal.
+19. Course management.
+20. Book management.
+21. CTF challenge creation.
+22. CTF flag validation.
+23. CTF scoring.
+24. CTF links.
+25. Learning progress persistence.
+26. Lab authorization and isolation.
+27. Responsive design.
+28. Database persistence.
+29. Audit logs.
+30. Security and authorization tests.
+
+Do not report a test as successful unless it was actually executed.
+
+# 23. IMPLEMENTATION REPORT
+
+After making changes, provide a detailed report:
+
+- Existing features preserved.
+- New features implemented.
+- Features successfully tested.
+- Features that remain frontend-only.
+- Features requiring external APIs or infrastructure.
+- Database changes.
+- Security limitations.
+- Broken features still remaining.
+- Deployment requirements.
+- Next recommended implementation steps.
+
+Do not hide incomplete work.
+
+# FINAL PRODUCT REQUIREMENT
+
+KALI3977 must become a comprehensive, expandable cybersecurity learning and competition ecosystem.
+
+It must not be just a course website, a CTF listing website, or a static dashboard.
+
+It must combine:
+
+LEARN — Deep academic and professional education.
+
+PRACTISE — Real hands-on labs and technical exercises.
+
+READ — Books, documentation, and research resources.
+
+CHALLENGE — A large and expandable CTF collection.
+
+COMPETE — Individual and inter-campus competitions.
+
+COLLABORATE — Private teams, team chat, and community.
+
+RESEARCH — Advanced and specialist cybersecurity knowledge.
+
+MASTER — Continuous learning from absolute beginner to expert.
+
+There must be no artificial learning ceiling. Even experienced professionals and researchers should have opportunities to learn new things.
+
+Build the platform carefully, prioritize correctness and security, and never sacrifice real functionality for visual appearance.

@@ -1,0 +1,1249 @@
+
+PROJECT: KALI3977
+
+TAGLINE:
+ZERO TO ADVANCED. Learn. Practise. Compete. Master.
+
+==================================================
+1. YOUR ROLE AND OBJECTIVE
+==================================================
+
+Act as a senior full-stack software architect, cybersecurity engineer, UI/UX designer, database architect and application security engineer.
+
+Build KALI3977: a complete, scalable, worldwide cybersecurity learning, practical training, multiplayer competition and university tournament platform.
+
+This is an independent cybersecurity education platform. It is NOT an official Kali Linux product.
+
+The platform must support beginners through advanced cybersecurity learners.
+
+Do not build only a landing page or visual prototype. Build the complete application architecture and implement as much working functionality as the environment supports.
+
+Do not silently omit features.
+
+If a feature requires infrastructure, credentials, external services or deployment configuration that is unavailable, implement its integration architecture and clearly document what is required.
+
+==================================================
+2. CORE PRODUCT REQUIREMENTS
+==================================================
+
+The platform must provide:
+
+1. Learning Academy.
+2. Cyber Labs.
+3. CTF Arena.
+4. Multiplayer Arena.
+5. Campus and Team Management.
+6. Tournaments and Events.
+7. Team Communication.
+8. AI Cyber Mentor.
+9. Community.
+10. Career Hub.
+11. Player Profiles and Achievements.
+12. Owner and Admin Control Centre.
+13. Security Monitoring and Audit Logs.
+14. Analytics and Leaderboards.
+
+All features should share one consistent account, permission, database and navigation system.
+
+Worldwide registration must be supported.
+
+The platform should be free for users as its product objective. Design efficient resource limits and free-tier-compatible infrastructure. Do not promise unlimited AI or lab computing resources.
+
+==================================================
+3. DESIGN AND USER EXPERIENCE
+==================================================
+
+Create a premium futuristic cybersecurity design.
+
+Visual identity:
+- Dark charcoal and near-black backgrounds.
+- Carefully selected neon green, cyan and violet accents.
+- Professional typography.
+- Subtle futuristic animations.
+- Modern dashboard cards.
+- Clean charts and data visualizations.
+- Professional icons.
+- Responsive desktop, tablet and mobile interfaces.
+
+Avoid:
+- Excessive glowing effects.
+- Cluttered interfaces.
+- Generic templates.
+- Unnecessary animations.
+- Fake terminal output.
+- Fake statistics presented as real data.
+
+Create a consistent design system with reusable components.
+
+Include:
+- Light and dark mode if practical.
+- Notifications.
+- Loading states.
+- Empty states.
+- Error handling.
+- Confirmation dialogs for destructive actions.
+- Accessible forms and navigation.
+
+==================================================
+4. APPLICATION NAVIGATION
+==================================================
+
+Create these main sections:
+
+1. Home
+2. Learning Academy
+3. Cyber Labs
+4. CTF Arena
+5. Multiplayer Arena
+6. Tournaments & Events
+7. AI Cyber Mentor
+8. Community
+9. Career Hub
+10. My Profile
+11. Notifications
+12. Settings
+
+Show admin navigation only to authorized accounts.
+
+==================================================
+5. ACCOUNTS AND AUTHENTICATION
+==================================================
+
+Implement:
+
+- Worldwide registration.
+- Login and logout.
+- Email verification.
+- Password recovery.
+- Secure session management.
+- Multi-factor authentication.
+- User profile management.
+- Account security settings.
+- Login history.
+- Session revocation.
+- Account suspension handling.
+
+User roles:
+
+- Guest
+- Player
+- Team Captain
+- Moderator
+- Event Admin
+- Owner / Super Admin
+
+Never allow users to select Owner or Admin during registration.
+
+OWNER ACCOUNT:
+
+The platform initially has one owner with complete control.
+
+Establish the initial owner through a secure server-side bootstrap process using deployment configuration and verified authentication.
+
+Never hardcode an owner password or secret master login.
+
+Require MFA for the owner.
+
+Only the owner can appoint or revoke administrators.
+
+==================================================
+6. PLAYER DASHBOARD
+==================================================
+
+Build a personalized dashboard showing:
+
+- Player level.
+- XP and ranking.
+- Learning progress.
+- Completed courses.
+- Completed labs.
+- CTF points.
+- Competition participation.
+- Current campus and team.
+- Achievements and badges.
+- Certificates.
+- Daily streak.
+- Upcoming events.
+- Recommended challenges.
+- Weak skills and improvement suggestions.
+
+All statistics must come from actual stored records.
+
+Do not generate fake progress or scores.
+
+==================================================
+7. LEARNING ACADEMY
+==================================================
+
+Build a complete cybersecurity learning system from zero to advanced.
+
+Learning stages:
+
+Stage 1: Computer Fundamentals
+Stage 2: Operating Systems and IT Foundations
+Stage 3: Networking Fundamentals
+Stage 4: Programming and Scripting
+Stage 5: Cybersecurity Fundamentals
+Stage 6: Practical Ethical Hacking
+Stage 7: Advanced Cybersecurity
+Stage 8: Expert-Level Security
+
+Include courses on:
+
+- Computer fundamentals.
+- Linux and Windows.
+- Networking.
+- TCP/IP, DNS, HTTP and HTTPS.
+- Python.
+- Bash and PowerShell.
+- Web technologies.
+- SQL.
+- Cryptography.
+- Authentication.
+- Network security.
+- Vulnerability management.
+- Reconnaissance.
+- Nmap.
+- Wireshark.
+- Burp Suite.
+- OWASP Top 10.
+- Web application security.
+- Active Directory security.
+- Digital forensics.
+- Incident response.
+- Malware analysis.
+- Cloud security.
+- Reverse engineering.
+- Red Team and Blue Team concepts.
+- Security operations.
+
+Course functionality:
+
+- Lessons.
+- Practical examples.
+- Diagrams.
+- Quizzes.
+- Assessments.
+- Notes.
+- Bookmarks.
+- Progress tracking.
+- Prerequisites.
+- Completion records.
+- Revision materials.
+
+Create a structure that allows admins to add, edit, publish, unpublish and delete learning content.
+
+Support multilingual content architecture, initially English with the ability to add Hindi.
+
+==================================================
+8. CYBER LABS
+==================================================
+
+Build hands-on cybersecurity practice labs.
+
+Lab categories:
+
+- Linux.
+- Networking.
+- Web Security.
+- Cryptography.
+- Digital Forensics.
+- OSINT.
+- Reverse Engineering.
+- Vulnerability Analysis.
+- Incident Response.
+- Cloud Security.
+
+Lab features:
+
+- Instructions.
+- Objectives.
+- Hints.
+- Difficulty levels.
+- Progress tracking.
+- Automatic verification.
+- Reset functionality.
+- Completion records.
+- Time limits.
+- Lab resource limits.
+
+CRITICAL SECURITY:
+
+Never execute arbitrary student code inside the main application or production backend.
+
+Use strongly isolated disposable environments for practical execution.
+
+Use microVMs or equivalent strong isolation for high-risk labs.
+
+Implement:
+- Per-user isolation.
+- CPU and RAM limits.
+- Execution time limits.
+- Restricted network access.
+- No production database access.
+- No production credentials.
+- No cross-user access.
+- Automatic cleanup.
+- Reset and termination controls.
+
+If lab infrastructure is unavailable, create the lab management architecture and clearly mark execution as requiring infrastructure. Do not simulate a real working lab.
+
+==================================================
+9. CTF ARENA
+==================================================
+
+Create a complete Capture The Flag platform.
+
+Categories:
+
+- Web Exploitation.
+- Cryptography.
+- Forensics.
+- OSINT.
+- Reverse Engineering.
+- Steganography.
+- Binary Exploitation.
+- Miscellaneous.
+
+Difficulty:
+- Beginner.
+- Easy.
+- Medium.
+- Hard.
+- Expert.
+
+Features:
+
+- Challenge descriptions.
+- Flag submission.
+- Server-side flag verification.
+- Hints.
+- Score calculation.
+- Challenge timers.
+- Challenge unlock conditions.
+- Leaderboards.
+- Submission history.
+- Explanations after completion.
+- Challenge authoring tools for admins.
+
+Support static and dynamic scoring.
+
+Prevent flag brute forcing and score manipulation.
+
+Never expose answer flags or secret validation logic in frontend code.
+
+==================================================
+10. MULTIPLAYER ARENA
+==================================================
+
+This is one of the most important platform modules.
+
+Players must be able to create or join multiplayer cybersecurity competitions.
+
+Competition types:
+
+- CTF Battle.
+- Team Battle.
+- Red vs Blue.
+- Cyber Investigation.
+- Cyber Rush.
+- Custom Cyber Games.
+
+Allow authorized users to create private practice rooms.
+
+Allow admins to organize official competitions.
+
+ROOM CODE AND TEAM CODE SYSTEM:
+
+There must be TWO COMPLETELY DISTINCT CODES.
+
+ROOM CODE:
+Identifies a particular competition room.
+
+TEAM CODE:
+Identifies the campus or team represented by a participant.
+
+Example:
+
+Competition Room:
+3977-CTF-82A
+
+Campus A:
+CAMPUS-001
+
+Campus B:
+CAMPUS-002
+
+Campus C:
+CAMPUS-003
+
+All players participating in the same competition enter the same Room Code.
+
+Players enter their own campus Team Code.
+
+One competition room can contain many campus teams.
+
+JOIN FLOW:
+
+1. Player logs in.
+2. Player selects Join Competition.
+3. Player enters Room Code.
+4. Player enters Team Code.
+5. Server validates both codes.
+6. Server verifies eligibility and capacity.
+7. Player joins the correct team lobby.
+
+Never trust frontend-only code validation.
+
+CAPACITY:
+
+Make room capacity and team capacity configurable.
+
+Example initial event:
+- 150 total participants.
+- 30 players per campus team.
+- 5 campus teams.
+
+Do not hardcode these limits.
+
+CODE MANAGEMENT:
+
+Authorized admins can:
+- Create codes.
+- View codes according to permission.
+- Regenerate codes.
+- Revoke codes.
+- Disable codes.
+- Set expiration.
+- Set usage limits.
+- Configure code access policies.
+
+Changing a code must invalidate the previous code immediately.
+
+Support configurable team enrollment policies:
+- Shared campus team codes.
+- Individual player invitations.
+- Organizer approval.
+- Campus verification.
+
+The owner can select which enrollment policy is used for each competition.
+
+TEAM MANAGEMENT:
+
+- Team name.
+- Campus affiliation.
+- Team logo.
+- Team captain.
+- Deputy captain.
+- Team members.
+- Team capacity.
+- Team statistics.
+- Team score.
+- Individual player score.
+
+Prevent unauthorized team switching and duplicate participation.
+
+==================================================
+11. COMPETITION MANAGEMENT AND RULES
+==================================================
+
+Admins must be able to configure:
+
+- Competition name.
+- Description.
+- Game mode.
+- Start date and time.
+- Registration opening and closing.
+- Duration.
+- Total participant capacity.
+- Per-team capacity.
+- Number of teams.
+- Participating campuses.
+- Difficulty.
+- Scoring system.
+- Penalties.
+- Hints.
+- Late joining.
+- Reconnection rules.
+- Eligibility.
+- Visibility: public or private.
+- Room and team code policies.
+
+Competition controls:
+
+- Start.
+- Pause.
+- Resume.
+- Extend.
+- End.
+- Cancel.
+- Publish results.
+
+RULE LOCKING:
+
+Once a competition starts, important rules, scoring settings, team limits and challenge configurations must be snapshotted.
+
+Changes during an active competition must not silently alter the event.
+
+Only authorized emergency overrides should be allowed, with complete audit logging.
+
+==================================================
+12. TEAM COMMUNICATION SYSTEM
+==================================================
+
+Build a built-in communication system.
+
+COMMUNICATION SPACES:
+
+1. Private Team Group Chat.
+2. Team Captain Chat.
+3. Competition Announcements.
+4. Organizer Chat.
+5. Direct Messages between teammates.
+
+FEATURES:
+
+- Real-time messaging.
+- Message replies.
+- Reactions.
+- Mentions.
+- Pinned messages.
+- Message search.
+- Online and offline status.
+- Unread message counts.
+- Chat history.
+- Message reporting.
+- Moderation.
+- Optional file sharing.
+- Optional voice communication.
+
+TEAM CHAT:
+
+Only verified members of the same team can access their team's private chat.
+
+Direct messages must be limited by competition and privacy settings.
+
+CAPTAIN CHAT:
+
+Only the team captain, authorized deputies and permitted organizers can access it.
+
+ORGANIZER CHAT:
+
+Only authorized event admins and moderators can access it.
+
+ADMIN CONTROLS:
+
+- Enable or disable team chat.
+- Enable or disable direct messages.
+- Enable or disable file sharing.
+- Enable or disable voice chat.
+- Mute participants.
+- Remove participants.
+- Review reported messages.
+- Configure retention.
+- Configure communication permissions.
+
+Use secure real-time infrastructure.
+
+Do not store sensitive chat content in publicly accessible database collections.
+
+Prevent users from accessing other teams' messages by manipulating API parameters.
+
+==================================================
+13. TOURNAMENTS AND EVENTS
+==================================================
+
+Build a complete tournament management system.
+
+Tournament formats:
+
+- Knockout.
+- Double Elimination.
+- Round Robin.
+- League.
+- Points Based.
+- Custom.
+
+Features:
+
+- Event registration.
+- Campus selection.
+- Team registration.
+- Team size.
+- Registration limits.
+- Waiting lists.
+- Schedules.
+- Brackets.
+- Live rankings.
+- Match results.
+- Event announcements.
+- Certificates.
+- Seasonal leagues.
+
+Allow recurring weekly and monthly events.
+
+Create inter-university tournaments.
+
+Allow the owner to appoint event-specific moderators.
+
+==================================================
+14. GAME FEATURES
+==================================================
+
+Design the architecture for these game modes:
+
+CTF BATTLE:
+Teams solve cybersecurity challenges to earn points.
+
+RED VS BLUE:
+Teams attack and defend controlled simulated environments.
+
+CYBER INVESTIGATION:
+Teams investigate simulated digital evidence and solve cases.
+
+CYBER RUSH:
+Players solve time-limited challenges.
+
+SOC CHALLENGE:
+Players detect simulated security incidents and respond.
+
+CRYPTOGRAPHY DUEL:
+Players solve cryptographic puzzles.
+
+NETWORK DEFENCE:
+Players protect simulated network environments.
+
+All attack and defence exercises must run in authorized isolated training environments.
+
+==================================================
+15. FAIR PLAY AND ANTI-CHEATING
+==================================================
+
+Implement:
+
+- Server-authoritative scoring.
+- Server-side flag validation.
+- Rate limiting.
+- Submission logs.
+- Suspicious activity detection.
+- Duplicate account detection signals.
+- Team switching restrictions.
+- Session tracking.
+- Competition event logs.
+- Manual review workflow.
+- Dispute and appeal system.
+
+Do not automatically ban players solely because of an AI suspicion score.
+
+Give authorized moderators tools to investigate and review evidence.
+
+==================================================
+16. AI CYBER MENTOR
+==================================================
+
+Integrate Gemini through a secure server-side API.
+
+Features:
+
+- Explain cybersecurity concepts.
+- Help understand error messages.
+- Teach Linux commands.
+- Explain programming.
+- Generate practice questions.
+- Give hints without revealing answers immediately.
+- Create personalized learning roadmaps.
+- Review code for security issues.
+- Explain CTF solutions after completion.
+- Support English and Hindi.
+- Offer beginner, intermediate and advanced explanations.
+
+AI must distinguish between educational simulation and real-world targets.
+
+Do not assist unauthorized attacks or malicious activity.
+
+Protect user privacy.
+
+Never expose the Gemini API key in frontend code.
+
+Configure AI usage limits and abuse prevention.
+
+==================================================
+17. COMMUNITY
+==================================================
+
+Create:
+
+- Public profiles.
+- Discussions.
+- Topic-based communities.
+- Team discovery.
+- Friends.
+- User reporting.
+- Moderation.
+- Community announcements.
+- Weekly challenges.
+- Monthly competitions.
+- Achievement sharing.
+
+Provide privacy settings for user profiles and activity.
+
+==================================================
+18. CAREER HUB
+==================================================
+
+Include:
+
+- Cybersecurity career roadmaps.
+- Internship preparation.
+- Resume guidance.
+- Interview practice.
+- GitHub portfolio guidance.
+- Project ideas.
+- Skill assessments.
+- Certification preparation.
+- Career resources.
+
+Do not promise jobs or internships.
+
+==================================================
+19. PLAYER PROFILES AND ACHIEVEMENTS
+==================================================
+
+Create player profiles with:
+
+- Username.
+- Profile picture.
+- Biography.
+- Skill categories.
+- XP.
+- Rank.
+- Achievements.
+- Competition history.
+- Team history.
+- Certificates.
+- Public/private profile settings.
+
+Certificates should have unique verification IDs and a public verification page.
+
+Only authorized completion records may generate certificates.
+
+==================================================
+20. OWNER CONTROL CENTRE
+==================================================
+
+The owner must have complete control of the platform.
+
+Create a dedicated secure Owner Dashboard.
+
+GLOBAL ANALYTICS:
+
+- Total registered users.
+- Active users.
+- Active competitions.
+- Active rooms.
+- Active teams.
+- Total campuses.
+- Total labs.
+- Total CTF challenges.
+- Platform activity.
+- Security alerts.
+
+USER MANAGEMENT:
+
+- View users.
+- Search users.
+- Suspend accounts.
+- Ban accounts.
+- Restore accounts.
+- Revoke sessions.
+- Review reports.
+
+ADMIN MANAGEMENT:
+
+- Appoint administrators.
+- Revoke administrators.
+- Appoint moderators.
+- Revoke moderators.
+- Configure permissions.
+- View admin activity.
+- Restrict admin scope.
+- Set temporary permissions.
+- Set permission expiry.
+
+ROOM MANAGEMENT:
+
+- Create rooms.
+- Edit rooms.
+- Delete rooms.
+- View room codes.
+- Regenerate room codes.
+- Revoke room codes.
+- Disable rooms.
+- Configure capacities.
+- Configure joining rules.
+
+TEAM MANAGEMENT:
+
+- Create teams.
+- Add and remove campuses.
+- Change team codes.
+- Regenerate team codes.
+- Revoke team codes.
+- Change team membership.
+- Change captains.
+- Change team capacities.
+- Suspend teams.
+
+RULE MANAGEMENT:
+
+- Configure competition rules.
+- Configure scoring.
+- Configure time limits.
+- Configure team limits.
+- Configure eligibility.
+- Configure permissions.
+- Lock active competition settings.
+- Apply authorized emergency overrides.
+
+CONTENT MANAGEMENT:
+
+- Create and edit courses.
+- Publish lessons.
+- Manage labs.
+- Manage CTF challenges.
+- Manage flags.
+- Manage tournaments.
+- Manage certificates.
+
+COMMUNICATION MANAGEMENT:
+
+- Configure chat permissions.
+- Moderate reports.
+- Mute users.
+- Disable communication features.
+- Manage announcements.
+
+SECURITY MANAGEMENT:
+
+- View security events.
+- View audit logs.
+- Review suspicious activities.
+- Revoke sessions.
+- Lock rooms.
+- Terminate labs.
+- Disable affected features.
+- Trigger incident response procedures.
+
+PLATFORM SETTINGS:
+
+- Configure feature availability.
+- Configure AI limits.
+- Configure resource limits.
+- Configure registration.
+- Configure maintenance mode.
+- Configure announcements.
+
+The owner must be able to control every module without editing source code.
+
+==================================================
+21. PERMISSION SYSTEM
+==================================================
+
+Use strict server-side Role-Based Access Control.
+
+OWNER:
+Full platform access.
+
+EVENT ADMIN:
+Access only to assigned events and explicitly granted functions.
+
+MODERATOR:
+Limited moderation permissions for assigned events.
+
+TEAM CAPTAIN:
+Manage permitted team activities and communication.
+
+PLAYER:
+Participate in allowed activities.
+
+Permissions must be individually configurable.
+
+Do not trust role names or permission flags submitted by the browser.
+
+Every sensitive API endpoint must validate the authenticated user's authorization.
+
+Admins must not grant themselves additional permissions.
+
+Only the owner can appoint or revoke administrators.
+
+Record all privileged actions in audit logs.
+
+==================================================
+22. SECURITY ARCHITECTURE
+==================================================
+
+Security is a core requirement.
+
+Implement:
+
+- Secure authentication.
+- MFA for owner and configurable admin MFA.
+- Server-side authorization.
+- Input validation.
+- Output encoding.
+- Rate limiting.
+- Secure session handling.
+- CSRF protection where applicable.
+- XSS protections.
+- SQL injection prevention.
+- Secure HTTP headers.
+- Secret management.
+- Dependency scanning.
+- Error handling without exposing secrets.
+- Database access controls.
+- Audit logging.
+- Backup and recovery architecture.
+- Security monitoring.
+
+Use parameterized database queries.
+
+Never expose secrets or API keys in frontend code.
+
+Never trust scores, flags, room permissions or team identity supplied by the browser.
+
+Separate production services from cyber lab execution environments.
+
+Do not claim that any system is completely unhackable.
+
+==================================================
+23. DATABASE AND BACKEND
+==================================================
+
+Use a maintainable architecture.
+
+Preferred stack:
+
+Frontend:
+React + TypeScript.
+
+Backend:
+Node.js + Express.
+
+Database:
+PostgreSQL.
+
+Authentication:
+Firebase Authentication or an equivalent secure authentication provider.
+
+AI:
+Gemini API through the backend.
+
+Real-time communication:
+Secure WebSocket infrastructure.
+
+Hosting target:
+Google Cloud Run or an equivalent scalable hosting environment.
+
+Lab infrastructure:
+Disposable isolated microVMs or equivalent.
+
+Monitoring:
+Structured server-side logging and security monitoring.
+
+Design database models for:
+
+- Users.
+- Roles.
+- Permissions.
+- User sessions.
+- Campuses.
+- Teams.
+- Team members.
+- Competitions.
+- Competition rules.
+- Rooms.
+- Room codes.
+- Team codes.
+- Invitations.
+- Registrations.
+- Challenges.
+- Flags.
+- Submissions.
+- Scores.
+- Leaderboards.
+- Tournaments.
+- Matches.
+- Messages.
+- Chat memberships.
+- Announcements.
+- Reports.
+- Audit logs.
+- Courses.
+- Lessons.
+- Labs.
+- Lab sessions.
+- Achievements.
+- Certificates.
+- Notifications.
+- AI usage records.
+
+Use database migrations, indexes, constraints and appropriate relationships.
+
+Never store plaintext passwords if using a custom authentication system.
+
+If using Firebase Authentication, let the authentication provider manage credential storage and do not duplicate password storage unnecessarily.
+
+==================================================
+24. REAL-TIME FUNCTIONALITY
+==================================================
+
+Support real-time:
+
+- Competition status.
+- Participant counts.
+- Team member presence.
+- Leaderboards.
+- Score updates.
+- Announcements.
+- Team chat.
+- Notifications.
+- Match progress.
+
+Use server-authoritative updates.
+
+Handle:
+- Disconnections.
+- Reconnection.
+- Duplicate submissions.
+- Concurrent score updates.
+- Expired sessions.
+- Room closure.
+
+Do not use frontend timers as the authoritative competition clock.
+
+==================================================
+25. ANALYTICS AND LEADERBOARDS
+==================================================
+
+Create:
+
+- Global leaderboard.
+- Campus leaderboard.
+- Team leaderboard.
+- Individual leaderboard.
+- Seasonal leaderboard.
+- Competition-specific leaderboard.
+- Skill-based rankings.
+
+Analytics:
+
+- Participation.
+- Performance.
+- Challenge completion.
+- Team performance.
+- Campus performance.
+- Learning progress.
+
+Provide CSV and PDF export for authorized admins.
+
+==================================================
+26. NOTIFICATIONS
+==================================================
+
+Implement in-app notifications for:
+
+- Competition invitations.
+- Registration confirmation.
+- Competition starting soon.
+- Room announcements.
+- Team invitations.
+- New chat messages.
+- Challenge completion.
+- Achievement unlocked.
+- Certificate issued.
+- Account and security alerts.
+
+Add notification preferences.
+
+==================================================
+27. ADMIN AUDIT LOGS
+==================================================
+
+Record:
+
+- Who performed the action.
+- What action was performed.
+- Which resource was affected.
+- Previous and new settings where appropriate.
+- Timestamp.
+- Relevant event or room.
+- Success or failure.
+
+Important changes must be reviewable and tamper-resistant.
+
+Never allow normal admins to delete or alter security audit records.
+
+==================================================
+28. PERFORMANCE AND SCALABILITY
+==================================================
+
+Design for:
+
+- Multiple simultaneous competitions.
+- Multiple campuses.
+- Hundreds or thousands of users as infrastructure scales.
+- Real-time chat.
+- Concurrent flag submissions.
+- High-volume leaderboards.
+
+Use pagination, database indexing, caching where appropriate and efficient API design.
+
+Do not assume that 150 participants is the maximum platform capacity.
+
+==================================================
+29. DEVELOPMENT QUALITY REQUIREMENTS
+==================================================
+
+Do not:
+
+- Build only a static mockup.
+- Create fake buttons.
+- Show fabricated statistics as real data.
+- Hardcode administrator permissions in frontend code.
+- Expose API secrets.
+- Use arbitrary code execution in the main backend.
+- Allow one team to read another team's private messages.
+- Trust client-side scores.
+- Expose CTF flags.
+- Skip authorization checks.
+- Claim incomplete integrations are working.
+
+Do:
+
+- Implement real functionality where possible.
+- Use reusable components.
+- Separate frontend and backend responsibilities.
+- Create clear API contracts.
+- Create database migrations.
+- Create environment variable examples.
+- Create automated tests.
+- Add error handling.
+- Add validation.
+- Add security tests.
+- Document infrastructure requirements.
+
+Every unfinished feature must be labelled accurately.
+
+==================================================
+30. TESTING AND VERIFICATION
+==================================================
+
+Create tests for:
+
+AUTHENTICATION:
+- Registration.
+- Login.
+- Logout.
+- Session expiration.
+- MFA.
+
+AUTHORIZATION:
+- Player cannot access admin endpoints.
+- Moderator cannot access owner functions.
+- Event admin cannot manage unrelated events.
+- Only owner can appoint administrators.
+
+ROOM SYSTEM:
+- Valid room code.
+- Invalid room code.
+- Expired room code.
+- Revoked room code.
+- Room capacity reached.
+
+TEAM SYSTEM:
+- Valid team code.
+- Invalid team code.
+- Team capacity reached.
+- Unauthorized team switching.
+- Duplicate registration.
+
+CHAT:
+- Team isolation.
+- Direct message permissions.
+- Captain chat access.
+- Organizer chat access.
+
+SCORING:
+- Valid flags.
+- Invalid flags.
+- Duplicate submissions.
+- Rate limits.
+- Score manipulation attempts.
+
+SECURITY:
+- SQL injection.
+- XSS.
+- CSRF where applicable.
+- Broken access control.
+- Session abuse.
+- Unauthorized API access.
+
+Use automated testing and security scanning.
+
+Do not deploy publicly until critical security tests pass.
+
+==================================================
+31. BUILD AND DELIVERY INSTRUCTIONS
+==================================================
+
+Build the complete application in a structured, maintainable manner.
+
+Do not stop after producing a landing page.
+
+Work through the complete architecture in logical implementation stages while following this single master specification.
+
+Prioritize a functional end-to-end foundation:
+
+1. Application structure and design system.
+2. Authentication and user roles.
+3. Database and backend APIs.
+4. Owner and admin permission system.
+5. Campus and team management.
+6. Room code and team code system.
+7. Competition registration and management.
+8. Team communication.
+9. CTF engine and scoring.
+10. Learning Academy.
+11. Cyber Labs and isolation integration.
+12. AI Cyber Mentor.
+13. Tournaments and analytics.
+14. Security testing and deployment preparation.
+
+Do not discard earlier modules when adding later modules.
+
+Maintain a central feature checklist and mark each feature as:
+
+- Implemented and tested.
+- Implemented but not tested.
+- Requires external configuration.
+- Not implemented.
+
+At the end, provide:
+
+1. Complete project folder structure.
+2. Frontend implementation.
+3. Backend implementation.
+4. Database schema and migrations.
+5. API documentation.
+6. Environment variable template.
+7. Setup instructions.
+8. Test instructions.
+9. Security limitations.
+10. Deployment instructions.
+11. Remaining implementation checklist.
+
+FIRST, inspect the available development environment and establish the architecture.
+
+Then implement the application, not merely a proposal describing how it could be built.
+
+The final result must be Kali3977: a unified cybersecurity learning and competition ecosystem.
