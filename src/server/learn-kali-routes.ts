@@ -24,7 +24,11 @@ import {
   sanitizeKaliLessonForStudent,
   sanitizeKaliMissionForStudent,
 } from '../lib/kali/progression.ts';
-import { validateSimulatorExerciseSubmission } from '../lib/kali/simulator.ts';
+import {
+  validateMissionCommandSequence,
+  validateSimulatorExerciseSubmission,
+} from '../lib/kali/simulator.ts';
+import { getExternalRunnerConfigStatus } from './lab-runner-client.ts';
 
 async function grantKaliAchievementIfMissing(userId: number, code: string) {
   const [ach] = await db.select().from(achievements).where(eq(achievements.code, code)).limit(1);
@@ -142,6 +146,7 @@ export function createLearnKaliRouter(): Router {
     }
 
     const levelSummary = computeUserKaliLevel(req.dbUser?.xp ?? 0, levels);
+    const runnerStatus = getExternalRunnerConfigStatus();
 
     res.json({
       section: 'learn-kali',
@@ -154,6 +159,14 @@ export function createLearnKaliRouter(): Router {
       missionProgress,
       userLevelSummary: levelSummary,
       leaderboard: leaderboardRows,
+      runnerStatus: {
+        configured: runnerStatus.configured,
+        connected: runnerStatus.configured,
+        mode: runnerStatus.executionMode,
+        label: runnerStatus.configured
+          ? 'Dedicated MicroVM Runner Online'
+          : 'Educational Browser Simulator Active (MicroVM Runner Not Connected)',
+      },
     });
   });
 
@@ -210,9 +223,11 @@ export function createLearnKaliRouter(): Router {
           const targetLesson = toolLessons.find((l) => l.id === lessonId) || toolLessons[0];
           const expectedToken = tool.slug.split('-')[0];
           const expectedPattern =
-            targetLesson?.commandPractice
-              ? `^${expectedToken}\\b`
-              : `^${expectedToken}\\b`;
+            expectedToken === 'linux'
+              ? '(?:pwd|ls|cat|grep|find|mkdir|touch)'
+              : targetLesson?.commandPractice
+                ? `(?:^|\\b)${expectedToken}\\b`
+                : `(?:^|\\b)${expectedToken}\\b`;
           const check = validateSimulatorExerciseSubmission(submittedCommand, expectedPattern);
           if (!check.matched) {
             return {
@@ -370,25 +385,19 @@ export function createLearnKaliRouter(): Router {
           )
           .limit(1);
 
-        // Validate terminal steps server-side against submitted commands or previously passed steps
-        const passedStepSet = new Set<string>(existingProgress?.stepsPassedJson ?? []);
+        // Validate terminal steps server-side via cumulative simulator replay
+        let passedStepIds = Array.from(new Set<string>(existingProgress?.stepsPassedJson ?? []));
         if (mission.terminalChallengeJson?.steps) {
-          for (const step of mission.terminalChallengeJson.steps) {
-            if (passedStepSet.has(step.id)) continue;
-            const anyMatched = submittedCommands.some(
-              (cmd) => validateSimulatorExerciseSubmission(cmd, step.expectedPattern).matched,
-            );
-            if (anyMatched) {
-              passedStepSet.add(step.id);
-            }
-          }
-          const missingSteps = mission.terminalChallengeJson.steps.filter(
-            (s) => !passedStepSet.has(s.id),
+          const validation = validateMissionCommandSequence(
+            submittedCommands,
+            mission.terminalChallengeJson.steps,
+            passedStepIds,
           );
-          if (missingSteps.length > 0) {
+          passedStepIds = validation.passedStepIds;
+          if (validation.missingSteps.length > 0) {
             return {
               status: 400,
-              error: `Terminal exercise incomplete. Next required step: ${missingSteps[0].instruction}`,
+              error: `Terminal exercise incomplete (${passedStepIds.length}/${mission.terminalChallengeJson.steps.length} step(s) verified). Run: ${validation.missingSteps[0].instruction}`,
             };
           }
         }
@@ -408,7 +417,7 @@ export function createLearnKaliRouter(): Router {
         const alreadyAwarded = Boolean(existingProgress?.xpAwarded);
         const xpToAward = alreadyAwarded ? 0 : mission.xpReward;
         const now = new Date();
-        const stepsPassedArr = Array.from(passedStepSet);
+        const stepsPassedArr = passedStepIds;
 
         const [saved] = await tx
           .insert(kaliUserMissionProgress)

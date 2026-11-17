@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
+  Bookmark,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
@@ -12,6 +13,7 @@ import {
   Terminal,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { LoadErrorState, LoadingState } from './LoadingState';
 import labDiagramImg from '../assets/images/academy_lab_diagram_1794688362798.jpg';
 
 interface WalkthroughStep {
@@ -68,7 +70,8 @@ interface LabSessionItem {
 }
 
 export const CyberLabs: React.FC = () => {
-  const { user, loginWithGoogle, apiFetch, refreshProfile } = useAuth();
+  const { user, learningExperience, toggleBookmark, hasBookmark, loginWithGoogle, apiFetch, refreshProfile } =
+    useAuth();
   const [labs, setLabs] = useState<LabItem[]>([]);
   const [sessions, setSessions] = useState<LabSessionItem[]>([]);
   const [runnerConnected, setRunnerConnected] = useState(false);
@@ -79,21 +82,31 @@ export const CyberLabs: React.FC = () => {
   const [explanations, setExplanations] = useState<Record<number, string>>({});
   const [statusNotice, setStatusNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [imgFailed, setImgFailed] = useState(false);
 
   const loadLabs = async () => {
-    const res = await apiFetch<{
-      labs: LabItem[];
-      sessions: LabSessionItem[];
-      runnerConnected?: boolean;
-    }>('/api/labs');
-    setLabs(res.labs || []);
-    setSessions(res.sessions || []);
-    setRunnerConnected(Boolean(res.runnerConnected));
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const res = await apiFetch<{
+        labs: LabItem[];
+        sessions: LabSessionItem[];
+        runnerConnected?: boolean;
+      }>('/api/labs');
+      setLabs(res.labs || []);
+      setSessions(res.sessions || []);
+      setRunnerConnected(Boolean(res.runnerConnected));
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : 'Unable to load cyber labs.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
-    loadLabs().catch((err) => setError(err instanceof Error ? err.message : 'Unable to load labs'));
+    void loadLabs();
   }, [user?.id]);
 
   const categories = ['All', ...Array.from(new Set(labs.map((l) => l.category)))];
@@ -167,8 +180,8 @@ export const CyberLabs: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Architecture & Security Boundary Banner */}
-      <div className="grid gap-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-6 lg:grid-cols-12 items-stretch">
-        <div className="lg:col-span-7 flex flex-col justify-between space-y-4">
+      <div className="grid gap-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-4 sm:p-6 lg:grid-cols-12 items-stretch min-w-0">
+        <div className="lg:col-span-7 flex flex-col justify-between space-y-4 min-w-0">
           <div className="space-y-2">
             <p className="text-xs font-medium text-cyan-600 dark:text-cyan-400">
               100% Free Hands-On Labs ·{' '}
@@ -219,6 +232,12 @@ export const CyberLabs: React.FC = () => {
         </div>
       </div>
 
+      {learningExperience === 'beginner' && (
+        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/8 px-4 py-3 text-xs text-slate-700 dark:text-slate-200">
+          <strong>Beginner Guide:</strong> Start with any <strong>Interactive Guided Lab</strong> card below (no external VM required). Expand <strong>Guided Walkthrough Steps</strong>, inspect the provided log or artifact, select your answer, and click <strong>Submit Verification</strong> to claim XP.
+        </div>
+      )}
+
       {statusNotice && (
         <div className="rounded-xl border border-cyan-500/30 bg-cyan-500/10 p-4 text-sm text-cyan-700 dark:text-cyan-300">
           {statusNotice}
@@ -249,7 +268,20 @@ export const CyberLabs: React.FC = () => {
       </div>
 
       {/* Lab Cards */}
-      <div className="grid gap-5 md:grid-cols-2">
+      {loading && labs.length === 0 ? (
+        <LoadingState
+          title="Loading Cyber Labs & Guided Walkthroughs..."
+          subtitle="Syncing isolated lab definitions and session telemetry."
+          onRetry={() => void loadLabs()}
+        />
+      ) : loadError && labs.length === 0 ? (
+        <LoadErrorState
+          title="Unable to load Cyber Labs"
+          message={loadError}
+          onRetry={() => void loadLabs()}
+        />
+      ) : (
+        <div className="grid gap-5 md:grid-cols-2">
         {filtered.map((lab) => {
           const latestSession = sessions.find((s) => s.labId === lab.id);
           const isCompleted = sessions.some((s) => s.labId === lab.id && s.status === 'completed');
@@ -271,14 +303,29 @@ export const CyberLabs: React.FC = () => {
           return (
             <div
               key={lab.id}
-              className="flex flex-col justify-between rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-5 space-y-4"
+              className="flex flex-col justify-between rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-4 sm:p-5 space-y-4 min-w-0 max-w-full"
             >
-              <div className="space-y-3">
+              <div className="space-y-3 min-w-0">
                 <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400">
                   <span>
                     {lab.category} · {lab.difficulty} · {lab.timeLimitMinutes} min · +{lab.xpReward} XP
                   </span>
                   <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        void toggleBookmark({ type: 'lab', slug: lab.slug, title: lab.title })
+                      }
+                      aria-label={`Bookmark ${lab.title}`}
+                      className={`inline-flex items-center gap-1 rounded border px-2 py-0.5 text-[11px] font-medium transition-colors ${
+                        hasBookmark('lab', lab.slug)
+                          ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                          : 'border-slate-200 dark:border-slate-700 text-slate-500'
+                      }`}
+                    >
+                      <Bookmark className="h-3 w-3" />
+                      {hasBookmark('lab', lab.slug) ? 'Saved' : 'Save'}
+                    </button>
                     {!lab.enabled && (
                       <span className="font-medium text-rose-500">Admin Preview (Disabled)</span>
                     )}
@@ -339,17 +386,17 @@ export const CyberLabs: React.FC = () => {
                       )}
                     </button>
                     {walkthroughOpen && (
-                      <div className="space-y-2.5 border-t border-slate-200 dark:border-slate-800 p-3 text-xs">
+                      <div className="space-y-2.5 border-t border-slate-200 dark:border-slate-800 p-3 text-xs min-w-0">
                         {lab.walkthroughJson.map((step) => (
-                          <div key={step.step} className="space-y-1">
+                          <div key={step.step} className="space-y-1.5 min-w-0">
                             <p className="font-semibold text-slate-800 dark:text-slate-200">
                               {step.step}. {step.title}
                             </p>
-                            <p className="text-slate-600 dark:text-slate-400">{step.instruction}</p>
-                            <pre className="overflow-x-auto rounded bg-slate-900 px-2.5 py-1.5 font-mono text-[11px] text-emerald-400">
+                            <p className="text-slate-600 dark:text-slate-400 break-words">{step.instruction}</p>
+                            <pre className="w-full max-w-full overflow-x-auto whitespace-pre rounded bg-slate-900 px-2.5 py-2 font-mono text-[11px] text-emerald-400">
                               {step.commandExample}
                             </pre>
-                            <p className="text-[11px] text-cyan-600 dark:text-cyan-400">
+                            <p className="text-[11px] text-cyan-600 dark:text-cyan-400 break-words">
                               Expected: {step.expectedObservation}
                             </p>
                           </div>
@@ -363,11 +410,11 @@ export const CyberLabs: React.FC = () => {
                 {lab.verificationRequired &&
                   lab.verificationMode === 'task_assessment' &&
                   lab.assessmentJson && (
-                    <div className="space-y-2.5 rounded-lg border border-cyan-500/30 bg-cyan-500/5 p-3">
-                      <p className="text-xs font-semibold text-cyan-700 dark:text-cyan-300">
+                    <div className="space-y-2.5 rounded-lg border border-cyan-500/30 bg-cyan-500/5 p-3 min-w-0">
+                      <p className="text-xs font-semibold text-cyan-700 dark:text-cyan-300 break-words">
                         {lab.assessmentJson.artifactLabel}
                       </p>
-                      <pre className="overflow-x-auto rounded bg-slate-950 p-2.5 font-mono text-[11px] leading-relaxed text-slate-200">
+                      <pre className="w-full max-w-full overflow-x-auto whitespace-pre rounded bg-slate-950 p-2.5 font-mono text-[11px] leading-relaxed text-slate-200">
                         {lab.assessmentJson.artifactContent}
                       </pre>
                       <p className="text-xs font-medium text-slate-800 dark:text-slate-200">
@@ -413,22 +460,22 @@ export const CyberLabs: React.FC = () => {
                   <span>Status: {sessionStatusLabel}</span>
                 </div>
 
-                <div className="flex flex-wrap gap-2">
+                <div className="grid grid-cols-1 sm:flex sm:flex-wrap gap-2">
                   <button
                     type="button"
                     onClick={() => void handleLaunch(lab)}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500 px-3.5 py-2 text-xs font-semibold text-slate-950 hover:bg-emerald-400 transition-colors whitespace-nowrap shrink-0"
+                    className="inline-flex w-full sm:w-auto items-center justify-center gap-1.5 rounded-lg bg-emerald-500 px-3.5 py-2 text-xs font-semibold text-slate-950 hover:bg-emerald-400 transition-colors min-h-[38px]"
                   >
-                    <Play className="h-3.5 w-3.5" />
+                    <Play className="h-3.5 w-3.5 shrink-0" />
                     {lab.runnerRequired ? 'Request Isolated Lab' : 'Start Interactive Lab'}
                   </button>
                   {latestSession && (
                     <button
                       type="button"
                       onClick={() => void handleReset(lab.id)}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-xs font-medium hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors whitespace-nowrap shrink-0"
+                      className="inline-flex w-full sm:w-auto items-center justify-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-xs font-medium hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors min-h-[38px]"
                     >
-                      <RotateCcw className="h-3.5 w-3.5" />
+                      <RotateCcw className="h-3.5 w-3.5 shrink-0" />
                       Reset
                     </button>
                   )}
@@ -438,9 +485,9 @@ export const CyberLabs: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => void handleVerify(lab)}
-                    className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-600 dark:text-emerald-300 hover:bg-emerald-500/20 transition-colors"
+                    className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-600 dark:text-emerald-300 hover:bg-emerald-500/20 transition-colors min-h-[38px]"
                   >
-                    <ShieldCheck className="h-3.5 w-3.5" />
+                    <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
                     {isCompleted
                       ? 'Mark Practice Walkthrough Reviewed'
                       : `Complete Guided Walkthrough (+${lab.xpReward} XP)`}
@@ -449,27 +496,27 @@ export const CyberLabs: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => void handleVerify(lab)}
-                    className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-3 py-2 text-xs font-semibold text-cyan-600 dark:text-cyan-300 hover:bg-cyan-500/20 transition-colors"
+                    className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-3 py-2 text-xs font-semibold text-cyan-600 dark:text-cyan-300 hover:bg-cyan-500/20 transition-colors min-h-[38px]"
                   >
-                    <ShieldCheck className="h-3.5 w-3.5" />
+                    <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
                     {isCompleted
                       ? 'Re-Verify Assessment Answer'
                       : `Submit Verification & Claim +${lab.xpReward} XP`}
                   </button>
                 ) : (
-                  <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2 min-w-0">
                     <input
                       type="text"
                       value={proofInputs[lab.id] || ''}
                       onChange={(e) => setProofInputs((p) => ({ ...p, [lab.id]: e.target.value }))}
                       placeholder="Enter lab verification token (e.g. LAB-PROOF-...)"
                       aria-label={`Verification token for ${lab.title}`}
-                      className="min-w-0 flex-1 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0A0D12] px-3 py-1.5 font-mono text-xs text-slate-900 dark:text-slate-100 focus:border-emerald-500 focus:outline-none"
+                      className="min-w-0 flex-1 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0A0D12] px-3 py-2 font-mono text-xs text-slate-900 dark:text-slate-100 focus:border-emerald-500 focus:outline-none min-h-[38px]"
                     />
                     <button
                       type="button"
                       onClick={() => void handleVerify(lab)}
-                      className="rounded-lg border border-cyan-500/40 px-3 py-1.5 text-xs font-medium text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/10 transition-colors whitespace-nowrap shrink-0"
+                      className="w-full sm:w-auto justify-center rounded-lg border border-cyan-500/40 px-3 py-2 text-xs font-medium text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/10 transition-colors min-h-[38px]"
                     >
                       Verify Proof
                     </button>
@@ -479,7 +526,8 @@ export const CyberLabs: React.FC = () => {
             </div>
           );
         })}
-      </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -3,18 +3,29 @@ import {
   AlertTriangle,
   Award,
   Bell,
+  Bookmark,
   Building2,
   Check,
+  Compass,
   Gavel,
   KeyRound,
   Laptop,
+  Monitor,
   ShieldCheck,
+  SlidersHorizontal,
+  Smartphone,
+  Sparkles,
   SunMoon,
+  Tablet,
+  Trash2,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useLayout } from '../context/LayoutContext';
 import { ConfirmDialog } from './ConfirmDialog';
 import { AdminSecurityNotice } from './AdminSecurityNotice';
-import type { Campus } from '../types/kali';
+import { LoadErrorState, LoadingState } from './LoadingState';
+import { LAYOUT_OPTIONS, formatDetectionSummary } from '../lib/domain/responsive-layout';
+import type { Campus, LayoutPreference, LearningExperience, NavSection } from '../types/kali';
 
 interface OverviewProfileSummary {
   campuses: Campus[];
@@ -66,8 +77,23 @@ interface CampusVerifRequest {
   createdAt: string;
 }
 
-export const ProfileView: React.FC = () => {
-  const { user, memberships, removedMemberships, authPending, loginWithGoogle, refreshProfile, apiFetch } = useAuth();
+export const ProfileView: React.FC<{ onNavigate?: (section: NavSection) => void }> = ({
+  onNavigate,
+}) => {
+  const {
+    user,
+    memberships,
+    removedMemberships,
+    bookmarks,
+    learningExperience,
+    progressionMode,
+    progressionSummary,
+    toggleBookmark,
+    authPending,
+    loginWithGoogle,
+    refreshProfile,
+    apiFetch,
+  } = useAuth();
   const [campuses, setCampuses] = useState<Campus[]>([]);
   const [summary, setSummary] = useState<OverviewProfileSummary['playerDashboard']>(null);
   const [verifRequests, setVerifRequests] = useState<CampusVerifRequest[]>([]);
@@ -645,6 +671,83 @@ export const ProfileView: React.FC = () => {
         </>
       )}
 
+      {/* Saved Bookmarks & Learning Shortcuts (Available to all learners) */}
+      <section className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-6 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Bookmark className="h-4 w-4 text-emerald-500" />
+            <h2 className="font-display text-base font-semibold">Saved Bookmarks &amp; Learning Experience</h2>
+          </div>
+          <span className="text-xs font-mono text-slate-500 dark:text-slate-400">
+            Experience: <strong className="capitalize text-emerald-600 dark:text-emerald-400">{learningExperience}</strong> ·{' '}
+            Progression: <strong className="capitalize">{progressionMode}</strong>
+          </span>
+        </div>
+
+        {progressionSummary && (
+          <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0A0D12] p-3.5 text-xs space-y-2">
+            <div className="flex items-center justify-between">
+              <span>
+                {progressionSummary.nextTier
+                  ? `Next Milestone (${progressionSummary.nextTier} experience)`
+                  : 'Expert Learning Experience Criteria Met'}
+              </span>
+              <span className="font-mono font-semibold text-emerald-500 tabular-nums">
+                {progressionSummary.xpProgressPct}%
+              </span>
+            </div>
+            <div className="h-1.5 w-full rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-emerald-500 transition-all"
+                style={{ width: `${progressionSummary.xpProgressPct}%` }}
+              />
+            </div>
+          </div>
+        )}
+
+        {bookmarks.length === 0 ? (
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            No bookmarks saved yet. Use the Bookmark button on any Academy course, Learn KALI tool, Cyber Lab, or CTF challenge to pin it here.
+          </p>
+        ) : (
+          <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+            {bookmarks.map((b) => {
+              const targetSection: NavSection =
+                b.type === 'course'
+                  ? 'academy'
+                  : b.type === 'tool'
+                    ? 'learn-kali'
+                    : b.type === 'lab'
+                      ? 'labs'
+                      : 'ctf';
+              return (
+                <div
+                  key={`${b.type}:${b.slug}`}
+                  className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0A0D12] px-3 py-2.5 text-xs"
+                >
+                  <button
+                    type="button"
+                    onClick={() => onNavigate?.(targetSection)}
+                    className="min-w-0 text-left hover:text-emerald-500"
+                  >
+                    <p className="font-semibold truncate text-slate-900 dark:text-slate-100">{b.title}</p>
+                    <p className="font-mono text-[10px] uppercase text-slate-500">{b.type}</p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void toggleBookmark({ type: b.type, slug: b.slug, title: b.title })}
+                    aria-label={`Remove bookmark ${b.title}`}
+                    className="rounded p-1 text-slate-400 hover:text-rose-500 shrink-0"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
       {/* Public Certificate Verification */}
       <section className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-6 space-y-4">
         <div className="flex items-center gap-2">
@@ -658,7 +761,7 @@ export const ProfileView: React.FC = () => {
             onChange={(e) => setVerifyId(e.target.value)}
             placeholder="Enter Certificate Verification ID (e.g. KALI3977-ACAD-1-...)"
             aria-label="Certificate Verification ID"
-            className="flex-1 min-w-[240px] rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0A0D12] px-3.5 py-2 font-mono text-xs"
+            className="w-full sm:w-auto sm:flex-1 min-w-0 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0A0D12] px-3.5 py-2 font-mono text-xs"
           />
           <button
             type="submit"
@@ -708,15 +811,26 @@ export const NotificationsView: React.FC = () => {
   const [items, setItems] = useState<
     Array<{ id: number; type: string; title: string; body: string; isRead: boolean; createdAt: string }>
   >([]);
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [markingAll, setMarkingAll] = useState(false);
 
   const load = async () => {
     if (!user) return;
-    const res = await apiFetch<{ notifications: any[] }>('/api/notifications');
-    setItems(res.notifications);
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const res = await apiFetch<{ notifications: any[] }>('/api/notifications');
+      setItems(res.notifications || []);
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : 'Unable to load notifications.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
-    load();
+    void load();
   }, [user?.id]);
 
   const markRead = async (id: number) => {
@@ -724,15 +838,40 @@ export const NotificationsView: React.FC = () => {
     await Promise.all([load(), refreshProfile()]);
   };
 
+  const markAllRead = async () => {
+    setMarkingAll(true);
+    try {
+      await apiFetch('/api/notifications/read-all', { method: 'POST' });
+      await Promise.all([load(), refreshProfile()]);
+    } finally {
+      setMarkingAll(false);
+    }
+  };
+
+  const unreadCount = items.filter((n) => !n.isRead).length;
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-display text-2xl font-bold text-slate-900 dark:text-slate-100">
-          Notifications
-        </h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400">
-          Competition updates, achievements, team invitations, and account security alerts.
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="font-display text-2xl font-bold text-slate-900 dark:text-slate-100">
+            Notifications
+          </h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Competition updates, achievements, team invitations, and account security alerts.
+          </p>
+        </div>
+        {user && unreadCount > 0 && (
+          <button
+            type="button"
+            disabled={markingAll}
+            onClick={() => void markAllRead()}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3.5 py-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 disabled:opacity-50 min-h-[38px]"
+          >
+            <Check className="h-3.5 w-3.5" />
+            {markingAll ? 'Updating...' : `Mark All Read (${unreadCount})`}
+          </button>
+        )}
       </div>
 
       {!user ? (
@@ -747,6 +886,18 @@ export const NotificationsView: React.FC = () => {
             {authPending ? 'Signing in...' : 'Sign In with Google'}
           </button>
         </div>
+      ) : loading && items.length === 0 ? (
+        <LoadingState
+          title="Loading Notifications..."
+          subtitle="Fetching security alerts, competition updates, and achievements."
+          onRetry={() => void load()}
+        />
+      ) : loadError && items.length === 0 ? (
+        <LoadErrorState
+          title="Unable to load Notifications"
+          message={loadError}
+          onRetry={() => void load()}
+        />
       ) : items.length === 0 ? (
         <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-8 text-center text-sm text-slate-500">
           <Bell className="mx-auto mb-2 h-6 w-6 text-slate-400" />
@@ -755,18 +906,18 @@ export const NotificationsView: React.FC = () => {
       ) : (
         <div className="divide-y divide-slate-200 dark:divide-slate-800 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F]">
           {items.map((n) => (
-            <div key={n.id} className="flex items-center justify-between gap-4 p-4">
-              <div>
+            <div key={n.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 p-4">
+              <div className="min-w-0">
                 <p className={`text-sm font-medium ${n.isRead ? 'text-slate-500' : 'text-slate-900 dark:text-slate-100'}`}>
                   {n.title}
                 </p>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{n.body}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 break-words">{n.body}</p>
               </div>
               {!n.isRead && (
                 <button
                   type="button"
-                  onClick={() => markRead(n.id)}
-                  className="inline-flex items-center gap-1 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs hover:bg-slate-100 dark:hover:bg-slate-800 whitespace-nowrap shrink-0"
+                  onClick={() => void markRead(n.id)}
+                  className="inline-flex items-center justify-center gap-1 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs hover:bg-slate-100 dark:hover:bg-slate-800 whitespace-nowrap shrink-0 self-start sm:self-center"
                 >
                   <Check className="h-3.5 w-3.5 text-emerald-500" />
                   Mark Read
@@ -780,9 +931,24 @@ export const NotificationsView: React.FC = () => {
   );
 };
 
-export const SettingsView: React.FC = () => {
-  const { user, sessions, loginHistory, theme, toggleTheme, authPending, loginWithGoogle, refreshProfile, apiFetch } =
-    useAuth();
+export const SettingsView: React.FC<{ onOpenOnboarding?: () => void }> = ({ onOpenOnboarding }) => {
+  const {
+    user,
+    sessions,
+    loginHistory,
+    theme,
+    learningExperience,
+    progressionMode,
+    learningConfig,
+    setAppearanceTheme,
+    setLearningExperience,
+    setProgressionMode,
+    authPending,
+    loginWithGoogle,
+    refreshProfile,
+    apiFetch,
+  } = useAuth();
+  const layout = useLayout();
   const [mfaSetup, setMfaSetup] = useState<{ secret: string; otpauthUri: string } | null>(null);
   const [totpCode, setTotpCode] = useState('');
   const [mfaMsg, setMfaMsg] = useState<string | null>(null);
@@ -851,28 +1017,217 @@ export const SettingsView: React.FC = () => {
           Settings & Account Security
         </h1>
         <p className="text-sm text-slate-500 dark:text-slate-400">
-          Configure appearance, notification preferences, TOTP multi-factor authentication, active sessions, and login history.
+          Configure display layout, appearance, learning guidance, notifications, TOTP MFA, active sessions, and login history.
         </p>
       </div>
 
-      {/* Appearance */}
-      <section className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-5">
-        <div className="flex items-center gap-3">
-          <SunMoon className="h-5 w-5 text-cyan-500" />
-          <div>
-            <h2 className="text-sm font-semibold">Interface Theme</h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              Currently active: {theme === 'dark' ? 'Dark Charcoal' : 'Light Slate'}
-            </p>
+      {/* 0. Display & Layout (Device-Adaptive Automatic / Manual Override — Independent from Colors & Skill Level) */}
+      <section
+        aria-label="Display and Layout Settings"
+        className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-5 space-y-4"
+      >
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <SlidersHorizontal className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />
+            <div>
+              <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                Display &amp; Layout Mode
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Adapt automatically to screen size and orientation, or pick a preferred layout style. Safe viewport clamping prevents clipping or overflow on smaller screens.
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-[11px] font-mono">
+            <span className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#0A0D12] px-2.5 py-1 text-slate-600 dark:text-slate-300">
+              Detected: {formatDetectionSummary(layout)}
+            </span>
+            <span className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-emerald-600 dark:text-emerald-400 capitalize">
+              Active: {layout.effectiveLayout}
+            </span>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={toggleTheme}
-          className="rounded-lg border border-slate-200 dark:border-slate-700 px-4 py-2 text-xs font-medium hover:bg-slate-100 dark:hover:bg-slate-800"
-        >
-          Switch to {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
-        </button>
+
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {LAYOUT_OPTIONS.map((opt) => {
+            const active = layout.preference === opt.id;
+            const Icon =
+              opt.id === 'mobile'
+                ? Smartphone
+                : opt.id === 'tablet'
+                  ? Tablet
+                  : opt.id === 'desktop'
+                    ? Monitor
+                    : SlidersHorizontal;
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                aria-pressed={active}
+                onClick={() => void layout.setPreference(opt.id as LayoutPreference)}
+                className={`rounded-xl border p-3.5 text-left transition-colors ${
+                  active
+                    ? 'border-emerald-500 bg-emerald-500/10'
+                    : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-900 dark:text-white">
+                    <Icon className="h-4 w-4 text-emerald-500 shrink-0" />
+                    {opt.label}
+                  </span>
+                  {active && <Check className="h-4 w-4 text-emerald-500 shrink-0" />}
+                </div>
+                <p className="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                  {opt.description}
+                </p>
+              </button>
+            );
+          })}
+        </div>
+
+        {layout.isSafeConstrained && (
+          <p className="text-[11px] text-amber-600 dark:text-amber-400">
+            Manual Safe Mode active: keeping desktop-style navigation &amp; layout preferences safely fitted inside your {layout.width}×{layout.height} viewport without horizontal overflow.
+          </p>
+        )}
+      </section>
+
+      {/* 1. Appearance Theme (Dark / Light — Independent from Learning Experience) */}
+      <section className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-5 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <SunMoon className="h-5 w-5 text-cyan-500" />
+            <div>
+              <h2 className="text-sm font-semibold">Appearance Theme (Visual Colors Only)</h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Choose Dark or Light mode independently from your Learning Experience level. Active: {theme === 'dark' ? 'Dark Mode' : 'Light Mode'}.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void setAppearanceTheme('dark')}
+              className={`rounded-lg border px-3.5 py-2 text-xs font-semibold transition-colors ${
+                theme === 'dark'
+                  ? 'border-emerald-500 bg-emerald-500 text-slate-950'
+                  : 'border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+            >
+              Dark Mode
+            </button>
+            <button
+              type="button"
+              onClick={() => void setAppearanceTheme('light')}
+              className={`rounded-lg border px-3.5 py-2 text-xs font-semibold transition-colors ${
+                theme === 'light'
+                  ? 'border-emerald-500 bg-emerald-500 text-slate-950'
+                  : 'border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+            >
+              Light Mode
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* 2. Learning Experience Theme & Automatic vs Manual Progression */}
+      <section className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-5 space-y-5">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <Sparkles className="h-5 w-5 text-emerald-500" />
+            <div>
+              <h2 className="text-sm font-semibold">Learning Experience &amp; Guidance Density</h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Tailors explanations, tooltips, and dashboard layout. Never locks advanced courses, tools, or permissions.
+              </p>
+            </div>
+          </div>
+          {onOpenOnboarding && (
+            <button
+              type="button"
+              onClick={onOpenOnboarding}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs font-medium hover:bg-slate-100 dark:hover:bg-slate-800"
+            >
+              <Compass className="h-3.5 w-3.5 text-cyan-500" />
+              Re-open Quick Start Tour
+            </button>
+          )}
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-3">
+          {(
+            [
+              {
+                id: 'beginner',
+                title: 'Beginner (Default)',
+                desc: 'Step-by-step guidance, glossary hints, and simplified workflows.',
+              },
+              {
+                id: 'intermediate',
+                title: 'Intermediate',
+                desc: 'Balanced command references, structured practice, and direct tips.',
+              },
+              {
+                id: 'expert',
+                title: 'Expert',
+                desc: 'Compact workspace with dense technical controls and minimal hints.',
+              },
+            ] as Array<{ id: LearningExperience; title: string; desc: string }>
+          ).map((opt) => (
+            <button
+              key={opt.id}
+              type="button"
+              onClick={() => void setLearningExperience(opt.id)}
+              className={`rounded-xl border p-3.5 text-left transition-colors ${
+                learningExperience === opt.id
+                  ? 'border-emerald-500 bg-emerald-500/10'
+                  : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+              }`}
+            >
+              <p className="text-xs font-bold text-slate-900 dark:text-white">{opt.title}</p>
+              <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">{opt.desc}</p>
+            </button>
+          ))}
+        </div>
+
+        <div className="border-t border-slate-200 dark:border-slate-800 pt-4 space-y-2">
+          <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+            Progression Mode
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => void setProgressionMode('automatic')}
+              className={`rounded-xl border p-3.5 text-left transition-colors ${
+                progressionMode === 'automatic'
+                  ? 'border-cyan-500 bg-cyan-500/10'
+                  : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+              }`}
+            >
+              <p className="text-xs font-bold text-slate-900 dark:text-white">Automatic Progression</p>
+              <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                Notifies you before suggesting an upgrade when you exceed{' '}
+                {learningConfig.beginnerMaxXp + 1} XP / {learningConfig.intermediateMaxXp + 1} XP and practical milestones.
+              </p>
+            </button>
+            <button
+              type="button"
+              onClick={() => void setProgressionMode('manual')}
+              className={`rounded-xl border p-3.5 text-left transition-colors ${
+                progressionMode === 'manual'
+                  ? 'border-cyan-500 bg-cyan-500/10'
+                  : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+              }`}
+            >
+              <p className="text-xs font-bold text-slate-900 dark:text-white">Manual Selection</p>
+              <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                Keeps your chosen Learning Experience locked unless you change it manually. Never overrides your choice.
+              </p>
+            </button>
+          </div>
+        </div>
       </section>
 
       {!user ? (
@@ -951,19 +1306,19 @@ export const SettingsView: React.FC = () => {
                   Add this secret key to your authenticator app:{' '}
                   <code className="font-mono font-semibold text-emerald-500">{mfaSetup.secret}</code>
                 </p>
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <input
                     type="text"
                     value={totpCode}
                     onChange={(e) => setTotpCode(e.target.value)}
                     placeholder="Enter 6-digit code"
                     aria-label="6-digit TOTP verification code"
-                    className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] px-3 py-2 font-mono text-xs"
+                    className="w-full sm:w-auto min-w-0 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] px-3 py-2 font-mono text-xs"
                     required
                   />
                   <button
                     type="submit"
-                    className="rounded-lg bg-emerald-500 px-4 py-2 text-xs font-semibold text-slate-950"
+                    className="rounded-lg bg-emerald-500 px-4 py-2 text-xs font-semibold text-slate-950 shrink-0"
                   >
                     Verify & Activate
                   </button>

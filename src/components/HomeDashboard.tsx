@@ -4,10 +4,15 @@ import {
   Award,
   BookOpen,
   Calendar,
+  Compass,
   Flag,
   FlaskConical,
+  Gamepad2,
+  HelpCircle,
   Library,
   ShieldAlert,
+  Sparkles,
+  Terminal,
   TrendingUp,
   Trophy,
   Users,
@@ -17,6 +22,7 @@ import { useSections } from '../context/SectionContext';
 import type { Campus, NavSection } from '../types/kali';
 import { AdminSecurityNotice } from './AdminSecurityNotice';
 import heroBannerImg from '../assets/images/hero_cyber_arena_1794688362854.jpg';
+import { getExperienceBadgeLabel } from '../lib/domain/learning-experience';
 
 interface OverviewPayload {
   platformStats: {
@@ -80,10 +86,24 @@ interface OverviewPayload {
   } | null;
 }
 
-export const HomeDashboard: React.FC<{ onNavigate: (section: NavSection) => void }> = ({
-  onNavigate,
-}) => {
-  const { user, memberships, authPending, loginWithGoogle, apiFetch } = useAuth();
+export const HomeDashboard: React.FC<{
+  onNavigate: (section: NavSection) => void;
+  onOpenOnboarding?: () => void;
+  onOpenHelp?: () => void;
+}> = ({ onNavigate, onOpenOnboarding, onOpenHelp }) => {
+  const {
+    user,
+    memberships,
+    authPending,
+    learningExperience,
+    progressionMode,
+    progressionSummary,
+    onboardingCompleted,
+    onboardingGoal,
+    bookmarks,
+    loginWithGoogle,
+    apiFetch,
+  } = useAuth();
   const { isSectionVisibleInNav } = useSections();
   const [data, setData] = useState<OverviewPayload | null>(null);
   const [loading, setLoading] = useState(true);
@@ -111,109 +131,135 @@ export const HomeDashboard: React.FC<{ onNavigate: (section: NavSection) => void
     };
   }, [apiFetch, user?.id]);
 
+  const isBeginner = learningExperience === 'beginner';
+  const isExpert = learningExperience === 'expert';
+  const experienceLabel = getExperienceBadgeLabel(learningExperience);
+
+  const recommendedStep = (() => {
+    const pd = data?.playerDashboard;
+    if (!pd || (pd.completedLessonsCount === 0 && pd.completedLabsCount === 0)) {
+      return {
+        title: 'Start with Linux CLI Foundations in Learn KALI',
+        detail:
+          'Practice safe essential commands like ls, pwd, cat, sudo apt update, and whois kali.org step by step before diving into live labs.',
+        target: isSectionVisibleInNav('learn-kali') ? ('learn-kali' as NavSection) : ('academy' as NavSection),
+        cta: 'Open Learn KALI Terminal',
+      };
+    }
+    if (pd.weakSkills.length > 0 && isSectionVisibleInNav('ctf')) {
+      return {
+        title: `Strengthen ${pd.weakSkills[0].category}`,
+        detail: pd.weakSkills[0].recommendation,
+        target: 'ctf' as NavSection,
+        cta: 'Practice in CTF Arena',
+      };
+    }
+    if (isSectionVisibleInNav('labs')) {
+      return {
+        title: 'Apply Your Knowledge in Hands-On Cyber Labs',
+        detail: 'Complete guided practical walkthroughs and security verification checks to earn extra XP.',
+        target: 'labs' as NavSection,
+        cta: 'Open Cyber Labs',
+      };
+    }
+    return {
+      title: 'Continue Your Cybersecurity Track',
+      detail: 'Explore structured stages in Learning Academy or join a multiplayer training room.',
+      target: 'academy' as NavSection,
+      cta: 'Continue Learning',
+    };
+  })();
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Announcement & Maintenance Strip */}
       {data?.platformControls?.maintenanceMode ? (
         <div className="flex items-center justify-between gap-4 rounded-xl border border-amber-500/40 bg-amber-500/10 px-5 py-3 text-sm">
-          <p className="text-amber-600 dark:text-amber-300 font-medium">
+          <p className="text-amber-700 dark:text-amber-300 font-medium">
             Scheduled Maintenance Notice: Some competitive operations may be paused by platform administration.
           </p>
-          <span className="text-xs font-mono text-amber-500 whitespace-nowrap shrink-0">Maintenance</span>
+          <span className="text-xs font-mono text-amber-600 dark:text-amber-400 whitespace-nowrap shrink-0">Maintenance</span>
         </div>
       ) : data?.globalAnnouncement ? (
-        <div className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] px-5 py-3 text-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] px-5 py-3 text-sm">
           <p className="text-slate-700 dark:text-slate-300">{data.globalAnnouncement}</p>
           <span className="text-xs font-mono text-emerald-600 dark:text-emerald-400 whitespace-nowrap shrink-0">
-            Announcement
+            {experienceLabel}
           </span>
         </div>
       ) : null}
 
-      {/* Hero Banner — Single focal anchor */}
-      <section className="relative overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-[#0D1118] min-h-[290px] flex items-end">
+      {/* 1. Welcome & Primary Start / Continue Banner */}
+      <section className="relative overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-[#0D1118] min-h-[260px] flex items-end">
         {!imgFailed ? (
           <img
             src={heroBannerImg}
             alt="KALI3977 cybersecurity operations and global network topology"
             referrerPolicy="no-referrer"
             onError={() => setImgFailed(true)}
-            className="absolute inset-0 h-full w-full object-cover opacity-70"
+            className="absolute inset-0 h-full w-full object-cover opacity-65"
           />
         ) : (
           <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-[#0E1622] to-emerald-950/50" />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/55 to-black/25" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/60 to-black/30" />
 
-        <div className="relative z-10 flex w-full flex-col justify-between gap-6 p-6 md:p-8 lg:flex-row lg:items-end">
-          <div className="max-w-2xl space-y-3">
+        <div className="kali-hero-layout relative z-10 flex w-full flex-col justify-between gap-5 sm:gap-6 p-5 sm:p-6 md:p-8 lg:flex-row lg:items-end">
+          <div className="max-w-2xl space-y-2.5 min-w-0">
             <p className="text-xs font-medium tracking-wide text-emerald-400">
-              Independent Worldwide Cybersecurity Education Platform · Not an Official Kali Linux Product
+              {user ? `Welcome back, ${user.displayName}` : 'Welcome to KALI3977'} · {experienceLabel}
             </p>
-            <h1 className="font-display text-3xl font-bold tracking-tight text-white md:text-4xl">
+            <h1 className="font-display text-2xl font-bold tracking-tight text-white md:text-4xl">
               ZERO TO ADVANCED. Learn. Practise. Compete. Master.
             </h1>
-            <p className="text-sm leading-relaxed text-slate-300 md:text-base">
-              Adaptive learning from Absolute Beginner to Research & Specialist level, open-access
-              cybersecurity books, isolated practical labs, and real-time campus CTF competitions.
+            <p className="text-sm leading-relaxed text-slate-200">
+              {onboardingGoal
+                ? `Active goal: ${onboardingGoal}. Follow your recommended next step or jump into any hub below.`
+                : 'Simple for beginners, practical for learners, and deep enough for specialists. Every course, command lab, and challenge stays open to explore.'}
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 shrink-0">
-            {!user ? (
+          <div className="flex flex-wrap items-center gap-2.5 min-w-0">
+            {isSectionVisibleInNav(recommendedStep.target) && (
+              <button
+                type="button"
+                onClick={() => onNavigate(recommendedStep.target)}
+                className="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-slate-950 hover:bg-emerald-400 transition-colors whitespace-nowrap shrink-0"
+              >
+                {data?.playerDashboard && data.playerDashboard.completedLessonsCount > 0
+                  ? 'Continue Learning'
+                  : 'Start Learning'}
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            )}
+            {!user && (
               <button
                 type="button"
                 disabled={authPending}
                 onClick={() => void loginWithGoogle()}
-                className="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-slate-950 hover:bg-emerald-400 disabled:opacity-60 disabled:cursor-not-allowed transition-colors whitespace-nowrap shrink-0"
+                className="rounded-lg border border-white/25 bg-black/40 px-4 py-2.5 text-sm font-medium text-white hover:bg-white/10 disabled:opacity-60 whitespace-nowrap shrink-0"
               >
-                {authPending ? 'Signing in...' : 'Sign In with Google'}
-                <ArrowRight className="h-4 w-4" />
-              </button>
-            ) : isSectionVisibleInNav('arena') ? (
-              <button
-                type="button"
-                onClick={() => onNavigate('arena')}
-                className="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-slate-950 hover:bg-emerald-400 transition-colors whitespace-nowrap shrink-0"
-              >
-                Enter Multiplayer Arena
-                <ArrowRight className="h-4 w-4" />
-              </button>
-            ) : null}
-            {isSectionVisibleInNav('learn-kali') && (
-              <button
-                type="button"
-                onClick={() => onNavigate('learn-kali')}
-                className="rounded-lg border border-cyan-500/50 bg-cyan-500/15 px-4 py-2.5 text-sm font-medium text-cyan-300 hover:bg-cyan-500/25 transition-colors whitespace-nowrap shrink-0"
-              >
-                Learn KALI
+                {authPending ? 'Signing in...' : 'Sign In to Save XP'}
               </button>
             )}
-            {isSectionVisibleInNav('games') && (
+            {onOpenOnboarding && (
               <button
                 type="button"
-                onClick={() => onNavigate('games')}
-                className="rounded-lg border border-emerald-500/50 bg-emerald-500/15 px-4 py-2.5 text-sm font-medium text-emerald-300 hover:bg-emerald-500/25 transition-colors whitespace-nowrap shrink-0"
+                onClick={onOpenOnboarding}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-400/40 bg-cyan-500/15 px-3.5 py-2.5 text-xs font-semibold text-cyan-200 hover:bg-cyan-500/25 whitespace-nowrap shrink-0"
               >
-                Games Arena (30 Games)
+                <Compass className="h-3.5 w-3.5" />
+                {onboardingCompleted ? 'Quick Start Guide' : 'Take Guided Tour'}
               </button>
             )}
-            {isSectionVisibleInNav('academy') && (
+            {onOpenHelp && (
               <button
                 type="button"
-                onClick={() => onNavigate('academy')}
-                className="rounded-lg border border-slate-600 bg-black/40 px-4 py-2.5 text-sm font-medium text-white hover:bg-white/10 transition-colors whitespace-nowrap shrink-0"
+                onClick={onOpenHelp}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-500/50 bg-black/40 px-3.5 py-2.5 text-xs font-medium text-slate-200 hover:bg-white/10 whitespace-nowrap shrink-0"
               >
-                Explore Academy
-              </button>
-            )}
-            {isSectionVisibleInNav('books') && (
-              <button
-                type="button"
-                onClick={() => onNavigate('books')}
-                className="rounded-lg border border-slate-600 bg-black/40 px-4 py-2.5 text-sm font-medium text-white hover:bg-white/10 transition-colors whitespace-nowrap shrink-0"
-              >
-                Browse Books
+                <HelpCircle className="h-3.5 w-3.5" />
+                Glossary &amp; Help
               </button>
             )}
           </div>
@@ -221,59 +267,205 @@ export const HomeDashboard: React.FC<{ onNavigate: (section: NavSection) => void
       </section>
 
       {error && (
-        <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-400">
+        <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-500">
           {error}
         </div>
       )}
 
-      {/* Real Database Metrics Strip */}
-      <section aria-label="Platform Statistics">
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-7">
-          {[
-            { label: 'Registered Learners', value: data?.platformStats.totalUsers ?? 0, icon: Users, visible: true },
-            { label: 'Academy Courses', value: data?.platformStats.totalCourses ?? 0, icon: BookOpen, visible: isSectionVisibleInNav('academy') },
-            { label: 'Library Books', value: data?.platformStats.totalBooks ?? 0, icon: Library, visible: isSectionVisibleInNav('books') },
-            { label: 'Isolated Labs', value: data?.platformStats.totalLabs ?? 0, icon: FlaskConical, visible: isSectionVisibleInNav('labs') },
-            { label: 'CTF Challenges', value: data?.platformStats.totalChallenges ?? 0, icon: Flag, visible: isSectionVisibleInNav('ctf') },
-            { label: 'Verified Campuses', value: data?.platformStats.totalCampuses ?? 0, icon: Award, visible: true },
-            { label: 'Competitions', value: data?.platformStats.totalCompetitions ?? 0, icon: Trophy, visible: isSectionVisibleInNav('arena') },
-          ]
-            .filter((s) => s.visible)
-            .map((stat) => {
-              const Icon = stat.icon;
-              return (
-                <div
-                  key={stat.label}
-                  className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-4"
-                >
-                <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
-                  <span className="text-xs font-medium">{stat.label}</span>
-                  <Icon className="h-4 w-4 text-cyan-500" />
-                </div>
-                <p className="mt-2 font-mono text-2xl font-bold text-slate-900 dark:text-slate-100 tabular-nums">
-                  {loading ? '—' : stat.value}
-                </p>
+      {/* 2. Quick-Action Hub Cards (Start Learning / Learn KALI / Practice / Play) */}
+      <section aria-label="Quick Start Actions" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {isSectionVisibleInNav('academy') && (
+          <button
+            type="button"
+            onClick={() => onNavigate('academy')}
+            className="group text-left rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-5 hover:border-emerald-500/50 transition-colors"
+          >
+            <div className="flex items-center justify-between">
+              <BookOpen className="h-5 w-5 text-emerald-500" />
+              <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-emerald-500 transition-colors" />
+            </div>
+            <h2 className="mt-3 font-display text-base font-bold text-slate-900 dark:text-white">
+              Learning Academy
+            </h2>
+            <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
+              {isExpert
+                ? 'Stages 1–8 modules, skill diagnostics, and verified completion certificates.'
+                : 'Step-by-step lessons in English or Hindi with interactive quizzes and notes.'}
+            </p>
+          </button>
+        )}
+
+        {isSectionVisibleInNav('learn-kali') && (
+          <button
+            type="button"
+            onClick={() => onNavigate('learn-kali')}
+            className="group text-left rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-5 hover:border-cyan-500/50 transition-colors"
+          >
+            <div className="flex items-center justify-between">
+              <Terminal className="h-5 w-5 text-cyan-500" />
+              <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-cyan-500 transition-colors" />
+            </div>
+            <h2 className="mt-3 font-display text-base font-bold text-slate-900 dark:text-white">
+              Learn KALI &amp; Linux CLI
+            </h2>
+            <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
+              {isExpert
+                ? 'Built-in simulator + Kali command workflows (whois, nmap, metasploit, sqlmap).'
+                : 'Try real commands like ls, whois, and apt safely in our guided browser terminal.'}
+            </p>
+          </button>
+        )}
+
+        {isSectionVisibleInNav('labs') && (
+          <button
+            type="button"
+            onClick={() => onNavigate('labs')}
+            className="group text-left rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-5 hover:border-amber-500/50 transition-colors"
+          >
+            <div className="flex items-center justify-between">
+              <FlaskConical className="h-5 w-5 text-amber-500" />
+              <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-amber-500 transition-colors" />
+            </div>
+            <h2 className="mt-3 font-display text-base font-bold text-slate-900 dark:text-white">
+              Practice: Labs &amp; CTF
+            </h2>
+            <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
+              Solve practical cybersecurity labs, download challenge artifacts, and verify flags.
+            </p>
+          </button>
+        )}
+
+        {isSectionVisibleInNav('games') && (
+          <button
+            type="button"
+            onClick={() => onNavigate('games')}
+            className="group text-left rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-5 hover:border-violet-500/50 transition-colors"
+          >
+            <div className="flex items-center justify-between">
+              <Gamepad2 className="h-5 w-5 text-violet-500" />
+              <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-violet-500 transition-colors" />
+            </div>
+            <h2 className="mt-3 font-display text-base font-bold text-slate-900 dark:text-white">
+              Play: Games &amp; Arenas
+            </h2>
+            <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
+              Play solo cyber challenges or invite friends using Room Codes and Team Codes.
+            </p>
+          </button>
+        )}
+      </section>
+
+      {/* 3. Recommended Next Step + Learning Experience Path */}
+      <section className="grid gap-6 lg:grid-cols-12">
+        <div className="lg:col-span-7 rounded-xl border border-emerald-500/30 bg-white dark:bg-[#11161F] p-5 sm:p-6 flex flex-col justify-between gap-4">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+              <Sparkles className="h-4 w-4" />
+              <span>Recommended Next Step</span>
+            </div>
+            <h2 className="font-display text-lg font-bold text-slate-900 dark:text-white">
+              {recommendedStep.title}
+            </h2>
+            <p className="text-sm text-slate-600 dark:text-slate-300">{recommendedStep.detail}</p>
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-200 dark:border-slate-800">
+            <span className="text-xs text-slate-500 dark:text-slate-400">
+              Mode: <strong className="capitalize text-slate-700 dark:text-slate-200">{learningExperience}</strong> ·{' '}
+              Progression: <strong className="capitalize text-slate-700 dark:text-slate-200">{progressionMode}</strong>
+            </span>
+            <button
+              type="button"
+              onClick={() => onNavigate(recommendedStep.target)}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500 px-4 py-2 text-xs font-semibold text-slate-950 hover:bg-emerald-400 whitespace-nowrap shrink-0"
+            >
+              {recommendedStep.cta}
+              <ArrowRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+
+        <div className="lg:col-span-5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-5 sm:p-6 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="font-display text-base font-bold text-slate-900 dark:text-white">
+              My Learning Path
+            </h2>
+            <button
+              type="button"
+              onClick={() => onNavigate('settings')}
+              className="text-xs font-medium text-cyan-600 dark:text-cyan-400 hover:underline"
+            >
+              Theme Settings
+            </button>
+          </div>
+
+          {progressionSummary ? (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-300">
+                <span>
+                  {progressionSummary.nextTier
+                    ? `Progress toward ${progressionSummary.nextTier} experience`
+                    : 'Expert Learning Experience Unlocked'}
+                </span>
+                <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                  {progressionSummary.xpProgressPct}%
+                </span>
               </div>
-            );
-          })}
+              <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-cyan-500 transition-all"
+                  style={{ width: `${progressionSummary.xpProgressPct}%` }}
+                />
+              </div>
+              <div className="grid grid-cols-3 kali-keep-cols gap-2 pt-1 text-center text-xs">
+                <div className="rounded-lg bg-slate-50 dark:bg-slate-900/60 p-2">
+                  <p className="font-mono font-bold text-slate-900 dark:text-white tabular-nums">
+                    {progressionSummary.completedLessonsCount}
+                  </p>
+                  <p className="text-[11px] text-slate-500">Lessons</p>
+                </div>
+                <div className="rounded-lg bg-slate-50 dark:bg-slate-900/60 p-2">
+                  <p className="font-mono font-bold text-slate-900 dark:text-white tabular-nums">
+                    {progressionSummary.practiceCount}
+                  </p>
+                  <p className="text-[11px] text-slate-500">Practical Tasks</p>
+                </div>
+                <div className="rounded-lg bg-slate-50 dark:bg-slate-900/60 p-2">
+                  <p className="font-mono font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                    {bookmarks.length}
+                  </p>
+                  <p className="text-[11px] text-slate-500">Saved</p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2 text-xs text-slate-600 dark:text-slate-400">
+              <p>
+                You can switch freely between <strong>Beginner</strong>, <strong>Intermediate</strong>, and <strong>Expert</strong> learning experiences at any time from the top bar without losing access to any content.
+              </p>
+              {isBeginner && (
+                <p className="text-emerald-600 dark:text-emerald-400 font-medium">
+                  Beginner Tip: Bookmark any course, Kali command, lab, or CTF to find it quickly later in My Profile.
+                </p>
+              )}
+            </div>
+          )}
         </div>
       </section>
 
-      {/* Personalized Player Dashboard (Strictly Real Stored Records) */}
+      {/* 4. Personalized Player Dashboard (Real Stored Records) */}
       {user && data?.playerDashboard && (
-        <section className="space-y-6">
+        <section className="space-y-5">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <h2 className="font-display text-xl font-semibold text-slate-900 dark:text-slate-100">
-                Player Progress & Telemetry
+              <h2 className="font-display text-lg font-semibold text-slate-900 dark:text-slate-100">
+                Recent Progress &amp; Telemetry
               </h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                {user.displayName} · Level {data.playerDashboard.level.level} · Rank #
-                {data.playerDashboard.globalRank}
-                {memberships[0] ? ` · ${memberships[0].teamName}` : ' · No active campus team'}
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Level {data.playerDashboard.level.level} · Global Rank #{data.playerDashboard.globalRank}
+                {memberships[0] ? ` · Team: ${memberships[0].teamName}` : ''}
               </p>
             </div>
-            <div className="text-right font-mono text-sm tabular-nums">
+            <div className="font-mono text-xs tabular-nums">
               <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
                 {data.playerDashboard.xp} XP
               </span>
@@ -284,7 +476,6 @@ export const HomeDashboard: React.FC<{ onNavigate: (section: NavSection) => void
             </div>
           </div>
 
-          {/* XP Level Bar */}
           <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-5">
             <div className="flex items-center justify-between text-xs font-medium text-slate-500 dark:text-slate-400 mb-2">
               <span>Level {data.playerDashboard.level.level} Progress</span>
@@ -331,37 +522,24 @@ export const HomeDashboard: React.FC<{ onNavigate: (section: NavSection) => void
                 </p>
               </div>
               <div>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Saved CTFs</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Saved Items</p>
                 <p className="mt-1 font-mono text-lg font-semibold tabular-nums">
-                  {data.playerDashboard.ctfBookmarksCount ?? 0}
+                  {bookmarks.length}
                 </p>
               </div>
             </div>
           </div>
 
           <div className="grid gap-6 lg:grid-cols-2">
-            {/* Weak Skills & Verified Diagnostic Levels */}
             <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-5 space-y-4">
               <div className="flex items-center gap-2">
                 <ShieldAlert className="h-4 w-4 text-amber-500" />
                 <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">
-                  Skill Gap Analysis & Diagnostics
+                  Skill Gap Analysis &amp; Diagnostics
                 </h3>
               </div>
-              {data.playerDashboard.verifiedSkills && data.playerDashboard.verifiedSkills.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {data.playerDashboard.verifiedSkills.map((sk) => (
-                    <span
-                      key={sk.subjectArea}
-                      className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 font-mono text-[11px] text-emerald-500"
-                    >
-                      {sk.subjectArea}: {sk.verifiedLevel} ({sk.scorePct}%)
-                    </span>
-                  ))}
-                </div>
-              )}
               {data.playerDashboard.weakSkills.length === 0 ? (
-                <p className="text-sm text-slate-500 dark:text-slate-400">
+                <p className="text-xs text-slate-500 dark:text-slate-400">
                   No weak-skill gaps recorded yet. Take a Diagnostic Assessment in Learning Academy or solve CTF challenges to calibrate your personalized path.
                 </p>
               ) : (
@@ -382,7 +560,6 @@ export const HomeDashboard: React.FC<{ onNavigate: (section: NavSection) => void
               )}
             </div>
 
-            {/* Recommended Challenges & Reading Progress */}
             <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-5 space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -421,47 +598,46 @@ export const HomeDashboard: React.FC<{ onNavigate: (section: NavSection) => void
         </section>
       )}
 
-      {/* Initial Participating Campuses Directory (5 NFSU Campuses) */}
-      {data?.campuses && data.campuses.length > 0 && (
-        <section className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-6 space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="font-display text-lg font-semibold text-slate-900 dark:text-slate-100">
-              Participating University Campuses ({data.campuses.length})
-            </h2>
-            {isSectionVisibleInNav('arena') && (
-              <button
-                type="button"
-                onClick={() => onNavigate('arena')}
-                className="text-xs font-medium text-emerald-500 hover:underline"
-              >
-                Join Campus Squad
-              </button>
-            )}
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-            {data.campuses.map((c) => (
-              <div
-                key={c.id}
-                className="rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0A0D12] p-3.5 text-xs"
-              >
-                <p className="font-semibold text-slate-900 dark:text-slate-100">{c.name}</p>
-                <p className="mt-1 text-slate-500">
-                  {c.city}, {c.country}
-                </p>
-                <p className="mt-1 font-mono text-[11px] text-cyan-500">{c.code}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
+      {/* 5. Real Database Metrics Strip */}
+      <section aria-label="Platform Statistics">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-7">
+          {[
+            { label: 'Registered Learners', value: data?.platformStats.totalUsers ?? 0, icon: Users, visible: true },
+            { label: 'Academy Courses', value: data?.platformStats.totalCourses ?? 0, icon: BookOpen, visible: isSectionVisibleInNav('academy') },
+            { label: 'Library Books', value: data?.platformStats.totalBooks ?? 0, icon: Library, visible: isSectionVisibleInNav('books') },
+            { label: 'Cyber Labs', value: data?.platformStats.totalLabs ?? 0, icon: FlaskConical, visible: isSectionVisibleInNav('labs') },
+            { label: 'CTF Challenges', value: data?.platformStats.totalChallenges ?? 0, icon: Flag, visible: isSectionVisibleInNav('ctf') },
+            { label: 'Verified Campuses', value: data?.platformStats.totalCampuses ?? 0, icon: Award, visible: true },
+            { label: 'Competitions', value: data?.platformStats.totalCompetitions ?? 0, icon: Trophy, visible: isSectionVisibleInNav('arena') },
+          ]
+            .filter((s) => s.visible)
+            .map((stat) => {
+              const Icon = stat.icon;
+              return (
+                <div
+                  key={stat.label}
+                  className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-4"
+                >
+                  <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
+                    <span className="text-xs font-medium">{stat.label}</span>
+                    <Icon className="h-4 w-4 text-cyan-500" />
+                  </div>
+                  <p className="mt-2 font-mono text-2xl font-bold text-slate-900 dark:text-slate-100 tabular-nums">
+                    {loading ? '—' : stat.value}
+                  </p>
+                </div>
+              );
+            })}
+        </div>
+      </section>
 
-      {/* Upcoming & Live Competitions */}
+      {/* 6. Upcoming & Live Competitions */}
       <section className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-6">
         <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
           <div className="flex items-center gap-2">
             <Calendar className="h-4 w-4 text-violet-500" />
             <h2 className="font-display text-lg font-semibold text-slate-900 dark:text-slate-100">
-              Active & Upcoming Competitions
+              Active &amp; Upcoming Competitions
             </h2>
           </div>
           {isSectionVisibleInNav('arena') && (
@@ -470,7 +646,7 @@ export const HomeDashboard: React.FC<{ onNavigate: (section: NavSection) => void
               onClick={() => onNavigate('arena')}
               className="text-sm font-medium text-cyan-600 dark:text-cyan-400 hover:underline"
             >
-              Join with Room & Team Code
+              Join with Room &amp; Team Code
             </button>
           )}
         </div>
@@ -504,4 +680,3 @@ export const HomeDashboard: React.FC<{ onNavigate: (section: NavSection) => void
     </div>
   );
 };
-

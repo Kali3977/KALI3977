@@ -6,10 +6,17 @@
     --font-display: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
     --font-sans: "DM Sans", system-ui, -apple-system, sans-serif;
     --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+    --kali-shell-padding: 1rem;
+  }
+
+  html, body {
+    font-family: var(--font-sans);
+    overflow-x: clip;
+    max-width: 100%;
   }
 
   body {
-    font-family: var(--font-sans);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
   h1, h2, h3, h4, .font-display {
@@ -25,4 +32,118 @@
 
 .tabular-nums {
   font-variant-numeric: tabular-nums;
+}
+
+/* ============================================================================
+   GLOBAL DEVICE-ADAPTIVE RESPONSIVE SYSTEM (KALI3977)
+   Supports Automatic viewport/orientation detection AND safe Manual layout overrides
+   ============================================================================ */
+
+/* Prevent horizontal overflow and clipping across every route, grid, table, and modal */
+.kali-shell-main,
+.kali-shell-main > *,
+.kali-shell-main .grid > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.kali-shell-main pre {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.kali-shell-main :not(pre) > code {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.kali-shell-main table {
+  max-width: 100%;
+}
+
+/* Mobile Layout Mode (Automatic on < 768px OR Manual "Mobile Layout" on any screen) */
+html[data-layout-effective="mobile"] .kali-shell-main {
+  max-width: min(100%, 46rem);
+  margin-inline: auto;
+  padding: 0.875rem !important;
+}
+
+/* Collapse multi-column page & section grids cleanly when Mobile Layout is active */
+html[data-layout-effective="mobile"] .kali-shell-main .grid:not(.kali-keep-cols) {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+html[data-layout-effective="mobile"] .kali-shell-main .grid:not(.kali-keep-cols) > [class*="col-span-"] {
+  grid-column: span 1 / span 1 !important;
+}
+
+html[data-layout-effective="mobile"] .kali-shell-main .kali-hero-layout,
+html[data-layout-effective="mobile"] .kali-shell-main .kali-stack-on-mobile {
+  flex-direction: column !important;
+  align-items: flex-start !important;
+}
+
+/* Tablet Layout Mode (Automatic on 768–1023px OR Manual "Tablet Layout" on any screen) */
+html[data-layout-effective="tablet"] .kali-shell-main {
+  max-width: min(100%, 64rem);
+  margin-inline: auto;
+  padding: 1.25rem !important;
+}
+
+html[data-layout-effective="tablet"] .kali-shell-main .kali-hero-layout {
+  flex-direction: column !important;
+  align-items: flex-start !important;
+}
+
+@media (min-width: 540px) {
+  html[data-layout-effective="tablet"] .kali-shell-main .grid:is([class*="grid-cols-3"], [class*="grid-cols-4"], [class*="grid-cols-6"], [class*="grid-cols-7"], [class*="grid-cols-12"]) {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  html[data-layout-effective="tablet"] .kali-shell-main .grid:is([class*="grid-cols-3"], [class*="grid-cols-4"], [class*="grid-cols-6"], [class*="grid-cols-7"], [class*="grid-cols-12"]) > [class*="lg:col-span-"],
+  html[data-layout-effective="tablet"] .kali-shell-main .grid:is([class*="grid-cols-3"], [class*="grid-cols-4"], [class*="grid-cols-6"], [class*="grid-cols-7"], [class*="grid-cols-12"]) > [class*="md:col-span-"] {
+    grid-column: span 2 / span 2 !important;
+  }
+}
+
+/* Manual Safety Clamp: if user picks Tablet or Desktop on a narrow phone viewport (< 540px / < 768px),
+   never force horizontal scroll or crush controls off-screen */
+@media (max-width: 539px) {
+  html[data-layout-effective="tablet"] .kali-shell-main .grid:not(.kali-keep-cols),
+  html[data-layout-effective="desktop"] .kali-shell-main .grid:not(.kali-keep-cols) {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  html[data-layout-effective="tablet"] .kali-shell-main .grid:not(.kali-keep-cols) > [class*="col-span-"],
+  html[data-layout-effective="desktop"] .kali-shell-main .grid:not(.kali-keep-cols) > [class*="col-span-"] {
+    grid-column: span 1 / span 1 !important;
+  }
+
+  html[data-layout-effective="desktop"] .kali-shell-main,
+  html[data-layout-effective="tablet"] .kali-shell-main {
+    padding: 0.875rem !important;
+  }
+}
+
+@media (min-width: 540px) and (max-width: 1023px) {
+  html[data-layout-effective="desktop"] .kali-shell-main .grid:is([class*="lg:grid-cols-4"], [class*="lg:grid-cols-7"], [class*="lg:grid-cols-12"], [class*="sm:grid-cols-6"]) {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  html[data-layout-effective="desktop"] .kali-shell-main .grid > [class*="lg:col-span-"] {
+    grid-column: span 2 / span 2 !important;
+  }
+}
+
+/* Compact Landscape Phone Adaptation (e.g. 844x390, 667x375) */
+html[data-orientation="landscape"][data-landscape-phone="true"] .kali-topbar {
+  height: 3rem !important;
+}
+
+html[data-orientation="landscape"][data-landscape-phone="true"] .kali-shell-main {
+  padding-block: 0.75rem !important;
+}
+
+html[data-orientation="landscape"][data-landscape-phone="true"] [role="dialog"] > div {
+  max-height: 92dvh !important;
 }

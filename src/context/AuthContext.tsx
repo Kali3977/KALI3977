@@ -23,9 +23,33 @@ import {
   type GoogleAuthStrategy,
   type PendingRedirectRecord,
 } from '../lib/auth-helpers';
-import type { UserProfile } from '../types/kali';
+import type {
+  AppearanceTheme,
+  BookmarkItem,
+  LayoutPreference,
+  LearningExperience,
+  LearningExperienceConfig,
+  ProgressionMode,
+  UserProfile,
+} from '../types/kali';
+import {
+  DEFAULT_LEARNING_EXPERIENCE_CONFIG,
+  normalizeAppearanceTheme,
+  normalizeLearningExperience,
+  normalizeProgressionMode,
+  type ProgressionEvaluation,
+} from '../lib/domain/learning-experience';
+import { normalizeLayoutPreference } from '../lib/domain/responsive-layout';
 
 const REDIRECT_PENDING_KEY = 'kali3977_auth_redirect_pending';
+const LS_THEME_KEY = 'kali3977_theme';
+const LS_EXPERIENCE_KEY = 'kali3977_learning_experience';
+const LS_PROGRESSION_KEY = 'kali3977_progression_mode';
+const LS_LAYOUT_PREF_KEY = 'kali3977_layout_preference';
+const LS_LAYOUT_DIRTY_KEY = 'kali3977_layout_preference_dirty';
+const LS_ONBOARDING_KEY = 'kali3977_onboarding_completed';
+const LS_GOAL_KEY = 'kali3977_onboarding_goal';
+const LS_BOOKMARKS_KEY = 'kali3977_bookmarks';
 
 function readPendingRedirectRecord(): PendingRedirectRecord | null {
   if (typeof window === 'undefined') return null;
@@ -107,6 +131,13 @@ interface LoginRecord {
   createdAt: string;
 }
 
+export interface ProgressionSummaryState extends ProgressionEvaluation {
+  completedLessonsCount: number;
+  completedLabsCount: number;
+  solvedChallengesCount: number;
+  completedMissionsCount: number;
+}
+
 interface AuthContextValue {
   firebaseUser: User | null;
   user: UserProfile | null;
@@ -123,8 +154,26 @@ interface AuthContextValue {
   canRetryWithRedirect: boolean;
   onlineCount: number;
   lastWsEvent: Record<string, unknown> | null;
-  theme: 'dark' | 'light';
+  theme: AppearanceTheme;
+  appearanceTheme: AppearanceTheme;
+  learningExperience: LearningExperience;
+  progressionMode: ProgressionMode;
+  layoutPreference: LayoutPreference;
+  onboardingCompleted: boolean;
+  onboardingGoal: string;
+  pendingThemeUpgrade: LearningExperience | null;
+  learningConfig: LearningExperienceConfig;
+  progressionSummary: ProgressionSummaryState | null;
+  bookmarks: BookmarkItem[];
   toggleTheme: () => void;
+  setAppearanceTheme: (next: AppearanceTheme) => Promise<void>;
+  setLearningExperience: (next: LearningExperience) => Promise<void>;
+  setProgressionMode: (next: ProgressionMode) => Promise<void>;
+  setLayoutPreference: (next: LayoutPreference) => Promise<void>;
+  completeOnboarding: (opts: { experience?: LearningExperience; goal?: string; skipped?: boolean }) => Promise<void>;
+  respondToThemeUpgrade: (decision: 'accept' | 'decline') => Promise<void>;
+  toggleBookmark: (item: { type: BookmarkItem['type']; slug: string; title: string }) => Promise<boolean>;
+  hasBookmark: (type: BookmarkItem['type'], slug: string) => boolean;
   clearAuthError: () => void;
   loginWithGoogle: (forceStrategy?: GoogleAuthStrategy | unknown) => Promise<void>;
   logout: () => Promise<void>;
@@ -160,12 +209,55 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [canRetryWithRedirect, setCanRetryWithRedirect] = useState(false);
   const [onlineCount, setOnlineCount] = useState(1);
   const [lastWsEvent, setLastWsEvent] = useState<Record<string, unknown> | null>(null);
-  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+  const [theme, setTheme] = useState<AppearanceTheme>(() => {
     if (typeof window !== 'undefined') {
-      const saved = window.localStorage.getItem('kali3977_theme');
-      if (saved === 'light' || saved === 'dark') return saved;
+      return normalizeAppearanceTheme(window.localStorage.getItem(LS_THEME_KEY), 'dark');
     }
     return 'dark';
+  });
+  const [learningExperience, setLearningExperienceState] = useState<LearningExperience>(() => {
+    if (typeof window !== 'undefined') {
+      return normalizeLearningExperience(window.localStorage.getItem(LS_EXPERIENCE_KEY), 'beginner');
+    }
+    return 'beginner';
+  });
+  const [progressionMode, setProgressionModeState] = useState<ProgressionMode>(() => {
+    if (typeof window !== 'undefined') {
+      return normalizeProgressionMode(window.localStorage.getItem(LS_PROGRESSION_KEY), 'automatic');
+    }
+    return 'automatic';
+  });
+  const [layoutPreference, setLayoutPreferenceState] = useState<LayoutPreference>(() => {
+    if (typeof window !== 'undefined') {
+      return normalizeLayoutPreference(window.localStorage.getItem(LS_LAYOUT_PREF_KEY), 'automatic');
+    }
+    return 'automatic';
+  });
+  const [onboardingCompleted, setOnboardingCompleted] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return window.localStorage.getItem(LS_ONBOARDING_KEY) === 'true';
+    }
+    return false;
+  });
+  const [onboardingGoal, setOnboardingGoal] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return window.localStorage.getItem(LS_GOAL_KEY) || '';
+    }
+    return '';
+  });
+  const [pendingThemeUpgrade, setPendingThemeUpgrade] = useState<LearningExperience | null>(null);
+  const [learningConfig, setLearningConfig] = useState<LearningExperienceConfig>(DEFAULT_LEARNING_EXPERIENCE_CONFIG);
+  const [progressionSummary, setProgressionSummary] = useState<ProgressionSummaryState | null>(null);
+  const [bookmarks, setBookmarks] = useState<BookmarkItem[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const parsed = JSON.parse(window.localStorage.getItem(LS_BOOKMARKS_KEY) || '[]');
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
   });
 
   const tokenRef = useRef<string | null>(null);
@@ -175,12 +267,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark');
-    window.localStorage.setItem('kali3977_theme', theme);
+    window.localStorage.setItem(LS_THEME_KEY, theme);
   }, [theme]);
 
-  const toggleTheme = useCallback(() => {
-    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
-  }, []);
+  useEffect(() => {
+    window.localStorage.setItem(LS_EXPERIENCE_KEY, learningExperience);
+  }, [learningExperience]);
+
+  useEffect(() => {
+    window.localStorage.setItem(LS_PROGRESSION_KEY, progressionMode);
+  }, [progressionMode]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(LS_LAYOUT_PREF_KEY, layoutPreference);
+    } catch {
+      // Ignore storage access errors
+    }
+  }, [layoutPreference]);
+
+  useEffect(() => {
+    window.localStorage.setItem(LS_ONBOARDING_KEY, onboardingCompleted ? 'true' : 'false');
+  }, [onboardingCompleted]);
+
+  useEffect(() => {
+    window.localStorage.setItem(LS_GOAL_KEY, onboardingGoal);
+  }, [onboardingGoal]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(LS_BOOKMARKS_KEY, JSON.stringify(bookmarks));
+    } catch {
+      // Ignore storage quota errors
+    }
+  }, [bookmarks]);
 
   const clearAuthError = useCallback(() => {
     setAuthError(null);
@@ -226,12 +346,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const data = await apiFetch<{
           authenticated: boolean;
           user: UserProfile | null;
+          learningExperienceConfig?: LearningExperienceConfig;
+          progressionSummary?: ProgressionSummaryState;
           memberships?: Membership[];
           removedMemberships?: RemovedMembership[];
           sessions?: SessionRecord[];
           loginHistory?: LoginRecord[];
           unreadNotifications?: number;
         }>('/api/auth/me');
+        if (data.learningExperienceConfig) {
+          setLearningConfig(data.learningExperienceConfig);
+        }
         if (data.authenticated && data.user) {
           setUser(data.user);
           setMemberships(data.memberships || []);
@@ -239,6 +364,52 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setSessions(data.sessions || []);
           setLoginHistory(data.loginHistory || []);
           setUnreadNotifications(data.unreadNotifications ?? 0);
+          setProgressionSummary(data.progressionSummary ?? null);
+
+          if (data.user.appearanceTheme === 'light' || data.user.appearanceTheme === 'dark') {
+            setTheme(data.user.appearanceTheme);
+          }
+          setLearningExperienceState(normalizeLearningExperience(data.user.learningExperience, 'beginner'));
+          setProgressionModeState(normalizeProgressionMode(data.user.progressionMode, 'automatic'));
+
+          // Safely migrate a guest's explicit layout choice on sign-in, otherwise hydrate from user profile
+          const serverLayout = normalizeLayoutPreference(data.user.layoutPreference, 'automatic');
+          let guestLayoutDirty = false;
+          let guestLayout: LayoutPreference = 'automatic';
+          try {
+            guestLayoutDirty = window.localStorage.getItem(LS_LAYOUT_DIRTY_KEY) === 'true';
+            guestLayout = normalizeLayoutPreference(window.localStorage.getItem(LS_LAYOUT_PREF_KEY), 'automatic');
+          } catch {
+            guestLayoutDirty = false;
+          }
+
+          if (guestLayoutDirty) {
+            setLayoutPreferenceState(guestLayout);
+            try {
+              window.localStorage.removeItem(LS_LAYOUT_DIRTY_KEY);
+            } catch {
+              // Ignore
+            }
+            if (guestLayout !== serverLayout) {
+              try {
+                await apiFetch('/api/profile/experience', {
+                  method: 'POST',
+                  body: JSON.stringify({ layoutPreference: guestLayout }),
+                });
+              } catch {
+                // Local preference remains intact; next change syncs again
+              }
+            }
+          } else {
+            setLayoutPreferenceState(serverLayout);
+          }
+
+          setOnboardingCompleted(Boolean(data.user.onboardingCompleted));
+          setOnboardingGoal(data.user.onboardingGoal || '');
+          setPendingThemeUpgrade(data.user.pendingThemeUpgrade ?? null);
+          if (Array.isArray(data.user.bookmarks)) {
+            setBookmarks(data.user.bookmarks);
+          }
         } else {
           setUser(null);
           setMemberships([]);
@@ -246,6 +417,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setSessions([]);
           setLoginHistory([]);
           setUnreadNotifications(0);
+          setPendingThemeUpgrade(null);
+          setProgressionSummary(null);
         }
       } catch (err) {
         console.error('Failed to sync profile:', err);
@@ -266,6 +439,178 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
   }, [apiFetch]);
+
+  const setAppearanceTheme = useCallback(
+    async (next: AppearanceTheme) => {
+      setTheme(next);
+      if (auth.currentUser) {
+        try {
+          await apiFetch('/api/profile/experience', {
+            method: 'POST',
+            body: JSON.stringify({ appearanceTheme: next }),
+          });
+        } catch {
+          // Local storage remains updated
+        }
+      }
+    },
+    [apiFetch],
+  );
+
+  const toggleTheme = useCallback(() => {
+    const next: AppearanceTheme = theme === 'dark' ? 'light' : 'dark';
+    void setAppearanceTheme(next);
+  }, [setAppearanceTheme, theme]);
+
+  const setLearningExperience = useCallback(
+    async (next: LearningExperience) => {
+      setLearningExperienceState(next);
+      setPendingThemeUpgrade(null);
+      if (auth.currentUser) {
+        try {
+          await apiFetch('/api/profile/experience', {
+            method: 'POST',
+            body: JSON.stringify({ learningExperience: next }),
+          });
+          await refreshProfile();
+        } catch {
+          // Local fallback stays active
+        }
+      }
+    },
+    [apiFetch, refreshProfile],
+  );
+
+  const setProgressionMode = useCallback(
+    async (next: ProgressionMode) => {
+      setProgressionModeState(next);
+      if (auth.currentUser) {
+        try {
+          await apiFetch('/api/profile/experience', {
+            method: 'POST',
+            body: JSON.stringify({ progressionMode: next }),
+          });
+          await refreshProfile();
+        } catch {
+          // Local fallback stays active
+        }
+      }
+    },
+    [apiFetch, refreshProfile],
+  );
+
+  const setLayoutPreference = useCallback(
+    async (nextInput: LayoutPreference) => {
+      const next = normalizeLayoutPreference(nextInput, 'automatic');
+      setLayoutPreferenceState(next);
+      try {
+        window.localStorage.setItem(LS_LAYOUT_PREF_KEY, next);
+      } catch {
+        // Ignore storage restrictions
+      }
+      if (auth.currentUser) {
+        try {
+          window.localStorage.removeItem(LS_LAYOUT_DIRTY_KEY);
+        } catch {
+          // Ignore
+        }
+        try {
+          await apiFetch('/api/profile/experience', {
+            method: 'POST',
+            body: JSON.stringify({ layoutPreference: next }),
+          });
+        } catch {
+          // Local fallback stays active
+        }
+      } else {
+        try {
+          window.localStorage.setItem(LS_LAYOUT_DIRTY_KEY, 'true');
+        } catch {
+          // Ignore
+        }
+      }
+    },
+    [apiFetch],
+  );
+
+  const completeOnboarding = useCallback(
+    async (opts: { experience?: LearningExperience; goal?: string; skipped?: boolean }) => {
+      setOnboardingCompleted(true);
+      if (opts.experience) {
+        setLearningExperienceState(opts.experience);
+      }
+      if (typeof opts.goal === 'string') {
+        setOnboardingGoal(opts.goal);
+      }
+      if (auth.currentUser) {
+        try {
+          await apiFetch('/api/profile/experience', {
+            method: 'POST',
+            body: JSON.stringify({
+              onboardingCompleted: true,
+              learningExperience: opts.experience,
+              onboardingGoal: opts.goal,
+            }),
+          });
+          await refreshProfile();
+        } catch {
+          // Local fallback stays active
+        }
+      }
+    },
+    [apiFetch, refreshProfile],
+  );
+
+  const respondToThemeUpgrade = useCallback(
+    async (decision: 'accept' | 'decline') => {
+      if (decision === 'accept' && pendingThemeUpgrade) {
+        setLearningExperienceState(pendingThemeUpgrade);
+      }
+      setPendingThemeUpgrade(null);
+      if (auth.currentUser) {
+        try {
+          await apiFetch('/api/profile/experience', {
+            method: 'POST',
+            body: JSON.stringify({ upgradeDecision: decision }),
+          });
+          await refreshProfile();
+        } catch {
+          // Ignore network glitches
+        }
+      }
+    },
+    [apiFetch, pendingThemeUpgrade, refreshProfile],
+  );
+
+  const toggleBookmark = useCallback(
+    async (item: { type: BookmarkItem['type']; slug: string; title: string }): Promise<boolean> => {
+      if (auth.currentUser) {
+        const res = await apiFetch<{ bookmarked: boolean; bookmarks: BookmarkItem[] }>('/api/profile/bookmarks/toggle', {
+          method: 'POST',
+          body: JSON.stringify(item),
+        });
+        setBookmarks(res.bookmarks || []);
+        return res.bookmarked;
+      }
+      let nextState = false;
+      setBookmarks((prev) => {
+        const exists = prev.some((b) => b.type === item.type && b.slug === item.slug);
+        if (exists) {
+          nextState = false;
+          return prev.filter((b) => !(b.type === item.type && b.slug === item.slug));
+        }
+        nextState = true;
+        return [{ ...item, addedAt: new Date().toISOString() }, ...prev].slice(0, 100);
+      });
+      return nextState;
+    },
+    [apiFetch],
+  );
+
+  const hasBookmark = useCallback(
+    (type: BookmarkItem['type'], slug: string) => bookmarks.some((b) => b.type === type && b.slug === slug),
+    [bookmarks],
+  );
 
   useEffect(() => {
     let active = true;
@@ -563,7 +908,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         onlineCount,
         lastWsEvent,
         theme,
+        appearanceTheme: theme,
+        learningExperience,
+        progressionMode,
+        layoutPreference,
+        onboardingCompleted,
+        onboardingGoal,
+        pendingThemeUpgrade,
+        learningConfig,
+        progressionSummary,
+        bookmarks,
         toggleTheme,
+        setAppearanceTheme,
+        setLearningExperience,
+        setProgressionMode,
+        setLayoutPreference,
+        completeOnboarding,
+        respondToThemeUpgrade,
+        toggleBookmark,
+        hasBookmark,
         clearAuthError,
         loginWithGoogle,
         logout,

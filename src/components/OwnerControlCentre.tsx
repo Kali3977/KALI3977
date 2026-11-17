@@ -3055,7 +3055,7 @@ export const OwnerControlCentre: React.FC = () => {
                           setIpReviewNotes((prev) => ({ ...prev, [ipRep.id]: e.target.value }))
                         }
                         placeholder="Administrative resolution or takedown note..."
-                        className="min-w-[220px] flex-1 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#11161F] px-2.5 py-1.5 text-xs"
+                        className="w-full sm:w-auto sm:flex-1 min-w-0 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#11161F] px-2.5 py-1.5 text-xs"
                       />
                       <button
                         type="button"

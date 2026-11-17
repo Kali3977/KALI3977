@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Trophy } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { LoadErrorState, LoadingState } from './LoadingState';
 import crestImg from '../assets/images/badge_tournament_crest_1794688363110.jpg';
 
 interface TournamentItem {
@@ -43,15 +44,28 @@ export const TournamentsView: React.FC = () => {
   const [boardTab, setBoardTab] = useState<'individual' | 'teams' | 'campuses'>('teams');
   const [regMessage, setRegMessage] = useState<string | null>(null);
   const [imgFailed, setImgFailed] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  useEffect(() => {
-    Promise.all([
-      apiFetch<{ tournaments: TournamentItem[] }>('/api/tournaments'),
-      apiFetch<LeaderboardsPayload>('/api/leaderboards'),
-    ]).then(([tRes, lRes]) => {
+  const loadTournaments = async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const [tRes, lRes] = await Promise.all([
+        apiFetch<{ tournaments: TournamentItem[] }>('/api/tournaments'),
+        apiFetch<LeaderboardsPayload>('/api/leaderboards'),
+      ]);
       setTournaments(tRes.tournaments);
       setBoards(lRes);
-    });
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : 'Unable to load tournaments and leaderboards.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadTournaments();
   }, [user?.id]);
 
   const handleRegister = async (tournamentId: number) => {
@@ -110,7 +124,20 @@ export const TournamentsView: React.FC = () => {
       )}
 
       {/* Tournaments & Brackets */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      {loading && tournaments.length === 0 ? (
+        <LoadingState
+          title="Loading Tournaments & Live Rankings..."
+          subtitle="Syncing seasonal brackets and university leaderboards."
+          onRetry={() => void loadTournaments()}
+        />
+      ) : loadError && tournaments.length === 0 ? (
+        <LoadErrorState
+          title="Unable to load Tournaments"
+          message={loadError}
+          onRetry={() => void loadTournaments()}
+        />
+      ) : (
+        <div className="grid gap-6 lg:grid-cols-2">
         {tournaments.map((t) => (
           <div
             key={t.id}
@@ -178,7 +205,8 @@ export const TournamentsView: React.FC = () => {
             )}
           </div>
         ))}
-      </div>
+        </div>
+      )}
 
       {/* Global, Team & Campus Leaderboards */}
       <section className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-6 space-y-5">

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Briefcase, Flag, MessageSquarePlus, Pencil, Search, Send, ThumbsUp, Trash2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { LoadErrorState, LoadingState } from './LoadingState';
 
 interface CommunityReply {
   id: number;
@@ -51,18 +52,28 @@ export const CommunityView: React.FC = () => {
   const [editBody, setEditBody] = useState('');
   const [statusNotice, setStatusNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadPosts = async () => {
-    const params = new URLSearchParams();
-    if (filterTopic !== 'All') params.set('topic', filterTopic);
-    if (searchQuery.trim()) params.set('q', searchQuery.trim());
-    const qs = params.toString() ? `?${params.toString()}` : '';
-    const res = await apiFetch<{ posts: CommunityPost[] }>(`/api/community${qs}`);
-    setPosts(res.posts);
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const params = new URLSearchParams();
+      if (filterTopic !== 'All') params.set('topic', filterTopic);
+      if (searchQuery.trim()) params.set('q', searchQuery.trim());
+      const qs = params.toString() ? `?${params.toString()}` : '';
+      const res = await apiFetch<{ posts: CommunityPost[] }>(`/api/community${qs}`);
+      setPosts(res.posts);
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : 'Unable to load community discussions.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
-    loadPosts();
+    void loadPosts();
   }, [filterTopic]);
 
   const handlePublish = async (e: React.FormEvent) => {
@@ -162,11 +173,11 @@ export const CommunityView: React.FC = () => {
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            loadPosts();
+            void loadPosts();
           }}
-          className="flex gap-2"
+          className="flex w-full sm:w-auto gap-2"
         >
-          <div className="relative">
+          <div className="relative flex-1 min-w-0">
             <Search className="pointer-events-none absolute left-2.5 top-2 h-3.5 w-3.5 text-slate-400" />
             <input
               type="search"
@@ -174,12 +185,12 @@ export const CommunityView: React.FC = () => {
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search discussions..."
               aria-label="Search community discussions"
-              className="rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0A0D12] pl-8 pr-3 py-1.5 text-xs"
+              className="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0A0D12] pl-8 pr-3 py-1.5 text-xs"
             />
           </div>
           <button
             type="submit"
-            className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs font-medium"
+            className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs font-medium shrink-0"
           >
             Filter
           </button>
@@ -242,7 +253,19 @@ export const CommunityView: React.FC = () => {
         </form>
 
         <div className="lg:col-span-8 space-y-4">
-          {posts.length === 0 ? (
+          {loading && posts.length === 0 ? (
+            <LoadingState
+              title="Loading Community Discussions..."
+              subtitle="Fetching study groups, write-ups, and team threads."
+              onRetry={() => void loadPosts()}
+            />
+          ) : loadError && posts.length === 0 ? (
+            <LoadErrorState
+              title="Unable to load Community"
+              message={loadError}
+              onRetry={() => void loadPosts()}
+            />
+          ) : posts.length === 0 ? (
             <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-8 text-sm text-slate-500">
               No community discussions match your filter yet. Start the first thread on the left!
             </div>
@@ -358,7 +381,7 @@ export const CommunityView: React.FC = () => {
                         <p className="mt-0.5 text-slate-600 dark:text-slate-300">{r.body}</p>
                       </div>
                     ))}
-                    <form onSubmit={(e) => handleReply(e, p.id)} className="flex gap-2 pt-1">
+                    <form onSubmit={(e) => handleReply(e, p.id)} className="flex flex-col sm:flex-row gap-2 pt-1">
                       <input
                         type="text"
                         value={replyDrafts[p.id] || ''}
@@ -369,7 +392,7 @@ export const CommunityView: React.FC = () => {
                       />
                       <button
                         type="submit"
-                        className="inline-flex items-center gap-1 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs font-medium hover:bg-slate-100 dark:hover:bg-slate-800"
+                        className="inline-flex items-center justify-center gap-1 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs font-medium hover:bg-slate-100 dark:hover:bg-slate-800 shrink-0"
                       >
                         <Send className="h-3 w-3" />
                         Reply

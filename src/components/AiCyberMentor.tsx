@@ -185,7 +185,7 @@ export const AiCyberMentor: React.FC = () => {
         {/* Live User Quotas & Reset Dates */}
         <div
           data-testid="mentor-quota-summary"
-          className="grid grid-cols-2 gap-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] px-4 py-2.5 text-xs sm:inline-flex sm:items-center sm:gap-5 shrink-0"
+          className="grid grid-cols-2 gap-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] px-4 py-2.5 text-xs w-full lg:w-auto sm:inline-flex sm:items-center sm:gap-5 kali-keep-cols"
         >
           <div>
             <p className="text-[11px] text-slate-500 dark:text-slate-400">Daily Remaining</p>
@@ -403,7 +403,7 @@ export const AiCyberMentor: React.FC = () => {
         )}
 
         <form onSubmit={handleAsk} className="space-y-2 border-t border-slate-200 dark:border-slate-800 pt-4">
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2">
             <input
               type="text"
               value={prompt}

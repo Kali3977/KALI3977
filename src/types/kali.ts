@@ -34,6 +34,42 @@ export interface PlatformSectionState {
   updatedAt?: string;
 }
 
+export type PrimaryHub =
+  | 'home'
+  | 'learn'
+  | 'practice'
+  | 'play'
+  | 'community'
+  | 'career'
+  | 'profile'
+  | 'admin';
+
+export type AppearanceTheme = 'dark' | 'light';
+
+export type LearningExperience = 'beginner' | 'intermediate' | 'expert';
+
+export type ProgressionMode = 'automatic' | 'manual';
+
+export type LayoutPreference = 'automatic' | 'mobile' | 'tablet' | 'desktop';
+
+export interface BookmarkItem {
+  type: 'course' | 'tool' | 'lab' | 'ctf';
+  slug: string;
+  title: string;
+  addedAt: string;
+}
+
+export interface LearningExperienceConfig {
+  defaultLearningExperience: LearningExperience;
+  autoProgressionEnabled: boolean;
+  beginnerMaxXp: number;
+  intermediateMaxXp: number;
+  minLessonsForIntermediate: number;
+  minPracticeForIntermediate: number;
+  minLessonsForExpert: number;
+  minPracticeForExpert: number;
+}
+
 export interface UserProfile {
   id: number;
   uid: string;
@@ -63,6 +99,15 @@ export interface UserProfile {
   policyAcknowledgedAt?: string | null;
   profileVisibility: 'public' | 'private';
   preferredLang: 'en' | 'hi';
+  appearanceTheme: AppearanceTheme;
+  learningExperience: LearningExperience;
+  progressionMode: ProgressionMode;
+  layoutPreference: LayoutPreference;
+  onboardingCompleted: boolean;
+  onboardingGoal: string;
+  pendingThemeUpgrade?: LearningExperience | null;
+  dismissedThemeUpgrade?: LearningExperience | null;
+  bookmarks?: BookmarkItem[];
   notificationPrefs: {
     competitions: boolean;
     teamChat: boolean;

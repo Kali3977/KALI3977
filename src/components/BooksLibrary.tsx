@@ -10,6 +10,7 @@ import {
   X,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { LoadErrorState, LoadingState } from './LoadingState';
 import { SafeRichText } from './SafeRichText';
 
 const BOOK_CATEGORIES = [
@@ -80,6 +81,7 @@ export const BooksLibrary: React.FC = () => {
   const { user, loginWithGoogle, apiFetch } = useAuth();
   const [books, setBooks] = useState<BookItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
   const [availability, setAvailability] = useState<'all' | 'free' | 'external_ref'>('all');
@@ -93,6 +95,7 @@ export const BooksLibrary: React.FC = () => {
 
   const loadBooks = async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const res = await apiFetch<{ books: BookItem[] }>('/api/books');
       setBooks(res.books);
@@ -100,13 +103,15 @@ export const BooksLibrary: React.FC = () => {
         const updated = res.books.find((b) => b.id === readerBook.id) || null;
         setReaderBook(updated);
       }
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : 'Unable to load Books Library.');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadBooks();
+    void loadBooks();
   }, [user?.id]);
 
   const filtered = useMemo(() => {
@@ -279,10 +284,18 @@ export const BooksLibrary: React.FC = () => {
       )}
 
       {/* Book Catalog Grid */}
-      {loading ? (
-        <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-8 text-sm text-slate-500">
-          Loading Books & Knowledge Library...
-        </div>
+      {loading && books.length === 0 ? (
+        <LoadingState
+          title="Loading Books & Knowledge Library..."
+          subtitle="Indexing open-access textbooks, GNU manuals, and reading progress."
+          onRetry={() => void loadBooks()}
+        />
+      ) : loadError && books.length === 0 ? (
+        <LoadErrorState
+          title="Unable to load Books Library"
+          message={loadError}
+          onRetry={() => void loadBooks()}
+        />
       ) : filtered.length === 0 ? (
         <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-8 text-sm text-slate-500">
           No books match the selected category, search query, or filter.
@@ -447,8 +460,8 @@ export const BooksLibrary: React.FC = () => {
           aria-label={`Reading ${readerBook.title}`}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4"
         >
-          <div className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0D1117]">
-            <div className="flex items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 px-6 py-4">
+          <div className="flex max-h-[90dvh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0D1117]">
+            <div className="flex items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 py-4">
               <div className="min-w-0">
                 <p className="font-mono text-[11px] text-emerald-500">
                   {readerBook.licenseType} · Online Reader
@@ -535,7 +548,7 @@ export const BooksLibrary: React.FC = () => {
                 </div>
               </aside>
 
-              <div className="p-6 md:col-span-8 space-y-4 overflow-y-auto">
+              <div className="p-4 sm:p-6 md:col-span-8 space-y-4 overflow-y-auto">
                 {readerBook.readableChaptersJson[chapterIndex] ? (
                   <>
                     <h3 className="font-display text-xl font-bold text-slate-900 dark:text-slate-100">

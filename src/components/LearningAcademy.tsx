@@ -11,8 +11,11 @@ import {
   Save,
   Search,
   Sparkles,
+  Terminal,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import type { NavSection } from '../types/kali';
+import { LoadErrorState, LoadingState } from './LoadingState';
 
 const ADAPTIVE_LEVELS = [
   'All',
@@ -107,8 +110,18 @@ interface SkillAssessment {
 
 type LessonTab = 'lesson' | 'exercises' | 'case_project' | 'revision' | 'references';
 
-export const LearningAcademy: React.FC = () => {
-  const { user, loginWithGoogle, apiFetch, refreshProfile } = useAuth();
+export const LearningAcademy: React.FC<{ onNavigate?: (section: NavSection) => void }> = ({
+  onNavigate,
+}) => {
+  const {
+    user,
+    learningExperience,
+    toggleBookmark,
+    hasBookmark,
+    loginWithGoogle,
+    apiFetch,
+    refreshProfile,
+  } = useAuth();
   const [courses, setCourses] = useState<CourseItem[]>([]);
   const [diagnostics, setDiagnostics] = useState<DiagnosticAssessment[]>([]);
   const [userSkills, setUserSkills] = useState<SkillAssessment[]>([]);
@@ -128,6 +141,7 @@ export const LearningAcademy: React.FC = () => {
   const [quizFeedback, setQuizFeedback] = useState<{ ok: boolean; text: string } | null>(null);
   const [notesDraft, setNotesDraft] = useState('');
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   // Diagnostic runner state
@@ -146,6 +160,7 @@ export const LearningAcademy: React.FC = () => {
 
   const loadAcademy = async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const res = await apiFetch<{
         courses: CourseItem[];
@@ -163,13 +178,15 @@ export const LearningAcademy: React.FC = () => {
         setActiveCourseId(res.courses[0].id);
         setNotesDraft(res.courses[0].lessons[0]?.progress?.notes || '');
       }
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : 'Unable to load cybersecurity curriculum.');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadAcademy();
+    void loadAcademy();
   }, [user?.id]);
 
   const subjectAreas = [
@@ -372,6 +389,24 @@ export const LearningAcademy: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {learningExperience === 'beginner' && (
+        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/8 px-4 py-3 text-xs text-slate-700 dark:text-slate-200 flex flex-wrap items-center justify-between gap-3">
+          <span>
+            <strong>How Academy Works:</strong> Pick any Stage 1–8 course on the left, read the lesson or switch to Practical Exercises, and answer the quick quiz at the bottom to earn <strong>+50 XP</strong> and unlock certificates. Already know a topic? Use <strong>Diagnostic &amp; Skip Assessment</strong> above.
+          </span>
+          {onNavigate && (
+            <button
+              type="button"
+              onClick={() => onNavigate('learn-kali')}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-white dark:bg-[#11161F] px-3 py-1.5 font-semibold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 whitespace-nowrap shrink-0"
+            >
+              <Terminal className="h-3.5 w-3.5" />
+              Try Commands in Learn KALI
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Verified Adaptive Skill Badges */}
       {userSkills.length > 0 && (
@@ -607,10 +642,18 @@ export const LearningAcademy: React.FC = () => {
         ))}
       </div>
 
-      {loading ? (
-        <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-8 text-sm text-slate-500">
-          Loading cybersecurity curriculum...
-        </div>
+      {loading && courses.length === 0 ? (
+        <LoadingState
+          title="Loading Cybersecurity Curriculum..."
+          subtitle="Fetching Stage 1–8 modules, practical exercises, and skill diagnostics."
+          onRetry={() => void loadAcademy()}
+        />
+      ) : loadError && courses.length === 0 ? (
+        <LoadErrorState
+          title="Unable to load Learning Academy"
+          message={loadError}
+          onRetry={() => void loadAcademy()}
+        />
       ) : (
         <div className="grid gap-6 lg:grid-cols-12">
           {/* Course List */}
@@ -660,27 +703,52 @@ export const LearningAcademy: React.FC = () => {
             {activeCourse && activeLesson ? (
               <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-5 sm:p-6 space-y-6">
                 <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
-                  <div className="min-w-0">
+                  <div className="min-w-0 space-y-1">
                     <p className="text-xs font-medium text-cyan-600 dark:text-cyan-400">
                       {activeCourse.stageTitle} · {activeCourse.adaptiveLevel || activeCourse.difficulty}
-                      {activeCourse.subjectArea ? ` · ${activeCourse.subjectArea}` : ''}
+                      {activeCourse.subjectArea ? ` · ${activeCourse.subjectArea}` : ''} ·{' '}
+                      <span className="font-mono tabular-nums">~{activeCourse.estimatedMinutes} min</span> ·{' '}
+                      <span>{activeCourse.lessons.length} module{activeCourse.lessons.length === 1 ? '' : 's'}</span>
                     </p>
-                    <h2 className="mt-1 font-display text-xl font-bold text-slate-900 dark:text-slate-100">
+                    <h2 className="font-display text-xl font-bold text-slate-900 dark:text-slate-100">
                       {lang === 'hi' ? activeLesson.titleHi : activeLesson.titleEn}
                     </h2>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      {lang === 'hi' ? activeCourse.summaryHi : activeCourse.summaryEn}
+                    </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleSaveNotesOrBookmark(activeLesson, true)}
-                    className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
-                      activeLesson.progress?.bookmarked
-                        ? 'border-amber-500/40 bg-amber-500/10 text-amber-500'
-                        : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
-                    }`}
-                  >
-                    <Bookmark className="h-3.5 w-3.5" />
-                    {activeLesson.progress?.bookmarked ? 'Bookmarked' : 'Bookmark'}
-                  </button>
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        void toggleBookmark({
+                          type: 'course',
+                          slug: activeCourse.slug,
+                          title: activeCourse.titleEn,
+                        })
+                      }
+                      className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
+                        hasBookmark('course', activeCourse.slug)
+                          ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                          : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+                      }`}
+                    >
+                      <Bookmark className="h-3.5 w-3.5" />
+                      {hasBookmark('course', activeCourse.slug) ? 'Course Saved' : 'Save Course'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSaveNotesOrBookmark(activeLesson, true)}
+                      className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
+                        activeLesson.progress?.bookmarked
+                          ? 'border-amber-500/40 bg-amber-500/10 text-amber-500'
+                          : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+                      }`}
+                    >
+                      <Bookmark className="h-3.5 w-3.5" />
+                      {activeLesson.progress?.bookmarked ? 'Lesson Bookmarked' : 'Bookmark Lesson'}
+                    </button>
+                  </div>
                 </div>
 
                 {/* Multi-lesson switcher inside course */}
@@ -769,7 +837,7 @@ export const LearningAcademy: React.FC = () => {
                         <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">
                           Practical Command Reference
                         </p>
-                        <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-emerald-700 dark:text-emerald-400">
+                        <pre className="w-full max-w-full overflow-x-auto whitespace-pre rounded bg-slate-950 p-2.5 font-mono text-xs leading-relaxed text-emerald-400">
                           {activeLesson.practicalExample}
                         </pre>
                       </div>

@@ -1,14 +1,24 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  AlertCircle,
   Award,
+  Bookmark,
   BookOpen,
+  Check,
   CheckCircle2,
   Compass,
+  Copy,
   ExternalLink,
+  Eye,
   Flame,
   Gamepad2,
+  HelpCircle,
+  Info,
+  Loader2,
   Lock,
+  Play,
   Search,
+  Server,
   ShieldCheck,
   Sparkles,
   Swords,
@@ -17,7 +27,9 @@ import {
   Wrench,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { validateMissionCommandSequence } from '../lib/kali/simulator';
 import { LearnKaliTerminal } from './LearnKaliTerminal';
+import { LoadErrorState, LoadingState } from './LoadingState';
 
 interface KaliLevelItem {
   id: number;
@@ -165,26 +177,54 @@ interface LearnKaliPayload {
     progressPercent: number;
   };
   leaderboard: LeaderboardEntry[];
+  runnerStatus?: {
+    configured: boolean;
+    connected?: boolean;
+    label: string;
+    provider?: string;
+    runnerUrlConfigured?: boolean;
+  };
 }
 
 type KaliTab = 'skill_tree' | 'catalog' | 'tool_detail' | 'missions' | 'terminal' | 'leaderboard';
 
 export const LearnKaliHub: React.FC = () => {
-  const { user, loginWithGoogle, apiFetch, refreshProfile } = useAuth();
+  const {
+    user,
+    learningExperience,
+    toggleBookmark,
+    hasBookmark,
+    loginWithGoogle,
+    apiFetch,
+    refreshProfile,
+  } = useAuth();
   const [data, setData] = useState<LearnKaliPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<KaliTab>('skill_tree');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedToolSlug, setSelectedToolSlug] = useState<string | null>(null);
-  const [commandTier, setCommandTier] = useState<'basic' | 'intermediate' | 'advanced'>('basic');
+  const [commandTier, setCommandTier] = useState<'basic' | 'intermediate' | 'advanced'>(() =>
+    learningExperience === 'expert' ? 'advanced' : learningExperience === 'intermediate' ? 'intermediate' : 'basic',
+  );
   const [missionFilter, setMissionFilter] = useState<string>('all');
   const [activeMissionId, setActiveMissionId] = useState<number | null>(null);
   const [missionCmdHistory, setMissionCmdHistory] = useState<Record<number, string[]>>({});
   const [missionAnswers, setMissionAnswers] = useState<Record<number, number>>({});
+  const [verifyingMissionId, setVerifyingMissionId] = useState<number | null>(null);
+  const [missionFeedback, setMissionFeedback] = useState<
+    Record<number, { ok: boolean; message: string; needsSignIn?: boolean }>
+  >({});
   const [lessonAnswers, setLessonAnswers] = useState<Record<number, number>>({});
   const [statusNotice, setStatusNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [envMode, setEnvMode] = useState<'simulator' | 'microvm'>('simulator');
+  const [externalRun, setExternalRun] = useState<{ nonce: number; command: string } | null>(null);
+  const [copiedCmdKey, setCopiedCmdKey] = useState<string | null>(null);
+  const [expandedOutputs, setExpandedOutputs] = useState<Record<string, boolean>>({});
+  const [expandedExplains, setExpandedExplains] = useState<Record<string, boolean>>({});
+  const [expandedHints, setExpandedHints] = useState<Record<string, boolean>>({});
+  const terminalSectionRef = useRef<HTMLDivElement | null>(null);
 
   const loadLearnKali = async () => {
     setLoading(true);
@@ -314,9 +354,25 @@ export const LearnKaliHub: React.FC = () => {
   };
 
   const handleCompleteMission = async (mission: KaliMissionItem) => {
-    if (!user) return loginWithGoogle();
+    if (!user) {
+      setMissionFeedback((prev) => ({
+        ...prev,
+        [mission.id]: {
+          ok: false,
+          needsSignIn: true,
+          message: 'Sign in with Google to verify your solution, save progress, and claim mission XP.',
+        },
+      }));
+      return;
+    }
     setError(null);
     setStatusNotice(null);
+    setVerifyingMissionId(mission.id);
+    setMissionFeedback((prev) => {
+      const next = { ...prev };
+      delete next[mission.id];
+      return next;
+    });
     try {
       const res = await apiFetch<{
         xpAwarded: number;
@@ -329,15 +385,25 @@ export const LearnKaliHub: React.FC = () => {
           selectedOption: missionAnswers[mission.id],
         }),
       });
-      setStatusNotice(
+      const successMessage =
         res.alreadyCompleted || res.xpAwarded === 0
-          ? `Mission "${mission.title}" re-verified (XP already awarded previously). ${res.explanation || ''}`
-          : `Mission Accomplished! Awarded +${res.xpAwarded} XP! ${res.explanation || ''}`,
-      );
+          ? `Mission verified (XP was already awarded previously). ${res.explanation || ''}`
+          : `Mission Accomplished! Awarded +${res.xpAwarded} XP! ${res.explanation || ''}`;
+      setMissionFeedback((prev) => ({
+        ...prev,
+        [mission.id]: { ok: true, message: successMessage },
+      }));
+      setStatusNotice(successMessage);
       await loadLearnKali();
       await refreshProfile();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to complete mission yet.');
+      const msg = err instanceof Error ? err.message : 'Unable to complete mission yet.';
+      setMissionFeedback((prev) => ({
+        ...prev,
+        [mission.id]: { ok: false, message: msg },
+      }));
+    } finally {
+      setVerifyingMissionId(null);
     }
   };
 
@@ -350,78 +416,138 @@ export const LearnKaliHub: React.FC = () => {
     return Math.round(list.reduce((acc, item) => acc + item.masteryScore, 0) / list.length);
   }, [data?.toolProgress]);
 
+  const runnerOnline = Boolean(data?.runnerStatus?.configured && data?.runnerStatus?.connected);
+
   if (loading && !data) {
     return (
-      <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-8 text-center text-sm text-slate-500">
-        Initializing Learn KALI Command Matrix...
-      </div>
+      <LoadingState
+        title="Initializing Learn KALI..."
+        subtitle="Loading skill tree, 28 Kali tools, guided lessons, missions, and safe educational terminal..."
+        timeoutMs={12000}
+        onRetry={() => void loadLearnKali()}
+      />
+    );
+  }
+
+  if (error && !data) {
+    return (
+      <LoadErrorState
+        title="Unable to initialize Learn KALI"
+        message={error}
+        onRetry={() => void loadLearnKali()}
+      />
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* Tactical Learn KALI Game HUD */}
-      <div className="rounded-2xl border border-emerald-500/25 bg-gradient-to-br from-slate-950 via-[#0D1520] to-[#081A1F] p-6 text-slate-100 space-y-5">
+      {/* Adaptive Light/Dark Learn KALI Header */}
+      <div className="rounded-2xl border border-emerald-500/25 bg-white dark:bg-gradient-to-br dark:from-slate-950 dark:via-[#0D1520] dark:to-[#081A1F] p-4 sm:p-6 text-slate-900 dark:text-slate-100 space-y-5 min-w-0">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="space-y-2 max-w-2xl">
+          <div className="space-y-2 max-w-2xl min-w-0">
             <div className="flex flex-wrap items-center gap-2 text-xs">
-              <span className="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/40 bg-emerald-500/15 px-2.5 py-0.5 font-semibold text-emerald-300">
-                <Gamepad2 className="h-3.5 w-3.5" />
-                Learn KALI · 100% Free Interactive Training Game
+              <span className="inline-flex items-center gap-1.5 font-semibold text-emerald-600 dark:text-emerald-300">
+                <Gamepad2 className="h-3.5 w-3.5 shrink-0" />
+                Learn KALI · 100% Free Interactive Training
               </span>
-              <span className="rounded-md border border-cyan-500/30 bg-cyan-500/10 px-2.5 py-0.5 text-cyan-300">
-                Safe Browser Terminal Simulation
+              <span className="text-slate-400">·</span>
+              <span className="font-mono text-cyan-600 dark:text-cyan-300">
+                {runnerOnline && envMode === 'microvm'
+                  ? 'Mode: Dedicated Kali MicroVM'
+                  : 'Mode: Educational Browser Simulator'}
               </span>
             </div>
-            <h1 className="font-display text-2xl sm:text-3xl font-bold tracking-tight">
-              Learn KALI — Zero to Elite Security Operator
+            <h1 className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+              Learn KALI — Linux Foundations to Security Operator
             </h1>
-            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-              Progress through Levels 1–8, unlock official Kali tool categories, master real flags
-              inside our simulated terminal, and defeat Missions, Daily Challenges &amp; Capstone Ops.
+            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+              Learn Linux commands, install packages with <code className="font-mono">apt</code>, inspect tools flag by flag, and run safe simulations right inside your browser.
             </p>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 shrink-0">
-            <div className="rounded-xl border border-slate-800 bg-slate-900/80 px-3.5 py-2.5">
-              <p className="text-[11px] text-slate-400">Operator Rank</p>
-              <p className="font-display text-base font-bold text-emerald-400">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full lg:w-auto kali-keep-cols">
+            <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/80 px-3.5 py-2.5">
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">Operator Rank</p>
+              <p className="font-display text-base font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
                 Lv.{data?.userLevelSummary.currentLevel.levelNumber ?? 1}
               </p>
             </div>
-            <div className="rounded-xl border border-slate-800 bg-slate-900/80 px-3.5 py-2.5">
-              <p className="text-[11px] text-slate-400">Tool Catalog</p>
-              <p className="font-display text-base font-bold text-cyan-300">
+            <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/80 px-3.5 py-2.5">
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">Tool Catalog</p>
+              <p className="font-display text-base font-bold text-cyan-600 dark:text-cyan-300 tabular-nums">
                 {data?.tools.length ?? 0} Tools
               </p>
             </div>
-            <div className="rounded-xl border border-slate-800 bg-slate-900/80 px-3.5 py-2.5">
-              <p className="text-[11px] text-slate-400">Missions Cleared</p>
-              <p className="font-display text-base font-bold text-violet-300">
+            <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/80 px-3.5 py-2.5">
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">Missions Cleared</p>
+              <p className="font-display text-base font-bold text-violet-600 dark:text-violet-300 tabular-nums">
                 {completedMissionsCount}/{data?.missions.length ?? 0}
               </p>
             </div>
-            <div className="rounded-xl border border-slate-800 bg-slate-900/80 px-3.5 py-2.5">
-              <p className="text-[11px] text-slate-400">Avg Mastery</p>
-              <p className="font-display text-base font-bold text-amber-300">{avgMastery}%</p>
+            <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/80 px-3.5 py-2.5">
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">Avg Mastery</p>
+              <p className="font-display text-base font-bold text-amber-600 dark:text-amber-300 tabular-nums">{avgMastery}%</p>
             </div>
           </div>
         </div>
 
+        {/* Honest Execution Environment Status (Never show disconnected VM as an available option) */}
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 px-4 py-2.5 text-xs">
+          <div className="flex flex-wrap items-center gap-2">
+            <Server className="h-4 w-4 text-emerald-500 shrink-0" />
+            <span className="font-semibold text-slate-800 dark:text-slate-200">Execution Environment:</span>
+            {runnerOnline ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setEnvMode('simulator')}
+                  className={`rounded-lg px-2.5 py-1 font-medium transition-colors ${
+                    envMode === 'simulator'
+                      ? 'bg-emerald-500 text-slate-950 font-semibold'
+                      : 'border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+                  }`}
+                >
+                  Browser Educational Simulator
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEnvMode('microvm')}
+                  className={`rounded-lg px-2.5 py-1 font-medium transition-colors ${
+                    envMode === 'microvm'
+                      ? 'bg-cyan-500 text-slate-950 font-semibold'
+                      : 'border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+                  }`}
+                >
+                  Real Kali MicroVM Runner
+                </button>
+              </>
+            ) : (
+              <span className="rounded-lg bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1 font-semibold text-emerald-600 dark:text-emerald-300">
+                Browser Educational Simulator Active
+              </span>
+            )}
+          </div>
+          <span className="text-slate-500 dark:text-slate-400">
+            {runnerOnline
+              ? 'MicroVM lab runner connected and ready.'
+              : 'Safe in-browser Linux & Kali sandbox active by default (dedicated Kali Linux VM not provisioned).'}
+          </span>
+        </div>
+
         {/* XP Level Progress Bar */}
-        <div className="space-y-1.5 border-t border-slate-800/80 pt-4">
+        <div className="space-y-1.5 border-t border-slate-200 dark:border-slate-800/80 pt-4">
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-            <span className="font-semibold text-emerald-300">
+            <span className="font-semibold text-emerald-600 dark:text-emerald-300">
               {data?.userLevelSummary.currentLevel.title || 'Level 1 — Linux Rookie'}
             </span>
-            <span className="text-slate-400">
+            <span className="text-slate-500 dark:text-slate-400">
               {user ? `${user.xp} XP` : 'Sign in with Google to track XP & unlock badges'}
               {data?.userLevelSummary.nextLevel
                 ? ` · Next: ${data.userLevelSummary.nextLevel.title} (${data.userLevelSummary.nextLevel.xpRequired} XP)`
                 : ' · Max Tier Unlocked'}
             </span>
           </div>
-          <div className="h-2 w-full overflow-hidden rounded-full bg-slate-800">
+          <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
             <div
               className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-cyan-400 transition-all"
               style={{ width: `${data?.userLevelSummary.progressPercent ?? 10}%` }}
@@ -431,7 +557,7 @@ export const LearnKaliHub: React.FC = () => {
       </div>
 
       {/* Mode Switcher */}
-      <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-1.5">
+      <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-1.5 min-w-0">
         {[
           { id: 'skill_tree', label: 'Skill Tree & Levels (1–8)', icon: Compass },
           { id: 'catalog', label: `Tool Library (${data?.tools.length ?? 0})`, icon: Wrench },
@@ -447,14 +573,14 @@ export const LearnKaliHub: React.FC = () => {
               key={item.id}
               type="button"
               onClick={() => setTab(item.id as KaliTab)}
-              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
+              className={`inline-flex max-w-full items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors min-h-[36px] ${
                 active
                   ? 'bg-emerald-500 text-slate-950 font-semibold'
                   : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
               }`}
             >
-              <Icon className="h-3.5 w-3.5" />
-              {item.label}
+              <Icon className="h-3.5 w-3.5 shrink-0" />
+              <span>{item.label}</span>
             </button>
           );
         })}
@@ -635,11 +761,11 @@ export const LearnKaliHub: React.FC = () => {
 
       {/* TAB 3: INDIVIDUAL DEDICATED TOOL LEARNING PAGE */}
       {tab === 'tool_detail' && selectedTool && (
-        <div className="space-y-6">
+        <div className="space-y-6 min-w-0">
           {/* Quick Tool Switcher */}
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-4">
-            <div>
-              <p className="text-xs text-cyan-600 dark:text-cyan-400">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-4 min-w-0">
+            <div className="min-w-0">
+              <p className="text-xs text-cyan-600 dark:text-cyan-400 break-words">
                 {selectedTool.categorySlug} · Level {selectedTool.minLevelNumber}+ ·{' '}
                 {selectedTool.difficulty} · Mastery:{' '}
                 {toolProgressMap.get(selectedTool.id)?.masteryScore ?? 0}%
@@ -649,12 +775,30 @@ export const LearnKaliHub: React.FC = () => {
               </h2>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto min-w-0">
+              <button
+                type="button"
+                onClick={() =>
+                  void toggleBookmark({
+                    type: 'tool',
+                    slug: selectedTool.slug,
+                    title: selectedTool.name,
+                  })
+                }
+                className={`inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors min-h-[34px] ${
+                  hasBookmark('tool', selectedTool.slug)
+                    ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                    : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+                }`}
+              >
+                <Bookmark className="h-3.5 w-3.5 shrink-0" />
+                {hasBookmark('tool', selectedTool.slug) ? 'Saved Tool' : 'Bookmark'}
+              </button>
               <select
                 value={selectedTool.slug}
                 onChange={(e) => openToolPage(e.target.value)}
                 aria-label="Select Kali tool to study"
-                className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#0A0D12] px-3 py-1.5 text-xs text-slate-900 dark:text-slate-100"
+                className="w-full sm:w-auto max-w-full min-w-0 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#0A0D12] px-3 py-1.5 text-xs text-slate-900 dark:text-slate-100 min-h-[34px]"
               >
                 {(data?.tools || []).map((t) => (
                   <option key={t.slug} value={t.slug}>
@@ -666,37 +810,39 @@ export const LearnKaliHub: React.FC = () => {
                 href={selectedTool.officialDocsUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 rounded-lg border border-cyan-500/40 px-3 py-1.5 text-xs font-medium text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/10"
+                className="inline-flex items-center gap-1 rounded-lg border border-cyan-500/40 px-3 py-1.5 text-xs font-medium text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/10 min-h-[34px]"
               >
-                Official Docs <ExternalLink className="h-3 w-3" />
+                Official Docs <ExternalLink className="h-3 w-3 shrink-0" />
               </a>
               {selectedTool.githubUrl && (
                 <a
                   href={selectedTool.githubUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs font-medium hover:bg-slate-100 dark:hover:bg-slate-800"
+                  className="inline-flex items-center gap-1 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs font-medium hover:bg-slate-100 dark:hover:bg-slate-800 min-h-[34px]"
                 >
-                  GitHub Repo <ExternalLink className="h-3 w-3" />
+                  GitHub Repo <ExternalLink className="h-3 w-3 shrink-0" />
                 </a>
               )}
             </div>
           </div>
 
-          <div className="grid gap-5 lg:grid-cols-12">
+          <div className="grid gap-5 lg:grid-cols-12 min-w-0">
             {/* Left Overview + Commands + Common Errors */}
-            <div className="lg:col-span-7 space-y-5">
-              <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-5 space-y-3">
+            <div className="lg:col-span-7 space-y-5 min-w-0">
+              <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-4 sm:p-5 space-y-3 min-w-0">
                 <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
                   Purpose, Installation &amp; Prerequisites
                 </h3>
                 <p className="text-xs leading-relaxed text-slate-600 dark:text-slate-300">
                   {selectedTool.purpose}
                 </p>
-                <div className="rounded-lg bg-slate-950 px-3 py-2 font-mono text-xs text-emerald-400">
-                  {selectedTool.installCommand}
+                <div className="w-full min-w-0 rounded-lg bg-slate-950 px-3 py-2.5">
+                  <pre className="w-full max-w-full overflow-x-auto whitespace-pre font-mono text-xs text-emerald-400">
+                    {selectedTool.installCommand}
+                  </pre>
                 </div>
-                <div className="flex flex-wrap gap-4 text-[11px] text-slate-500 dark:text-slate-400">
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500 dark:text-slate-400">
                   <span>OS: {selectedTool.supportedOs}</span>
                   <span>Version: {selectedTool.versionNote}</span>
                   <span>Status: {selectedTool.status}</span>
@@ -714,18 +860,18 @@ export const LearnKaliHub: React.FC = () => {
               </div>
 
               {/* Command Tier Breakdown */}
-              <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-5 space-y-4">
+              <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-4 sm:p-5 space-y-4 min-w-0">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
                     Flag-by-Flag Command Mastery
                   </h3>
-                  <div className="flex gap-1">
+                  <div className="flex flex-wrap gap-1.5">
                     {(['basic', 'intermediate', 'advanced'] as const).map((tier) => (
                       <button
                         key={tier}
                         type="button"
                         onClick={() => setCommandTier(tier)}
-                        className={`rounded px-2.5 py-1 text-[11px] font-medium capitalize ${
+                        className={`rounded-md px-2.5 py-1.5 text-[11px] font-medium capitalize ${
                           commandTier === tier
                             ? 'bg-emerald-500 text-slate-950 font-semibold'
                             : 'border border-slate-200 dark:border-slate-700 text-slate-500'
@@ -752,31 +898,126 @@ export const LearnKaliHub: React.FC = () => {
                     );
                   }
                   return (
-                    <div className="space-y-3">
-                      {list.map((ex, i) => (
-                        <div
-                          key={i}
-                          className="rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0A0D12] p-3.5 space-y-2"
-                        >
-                          <pre className="overflow-x-auto font-mono text-xs text-emerald-500 font-semibold">
-                            $ {ex.command}
-                          </pre>
-                          <p className="text-xs text-slate-600 dark:text-slate-300">
-                            {ex.explanation}
-                          </p>
-                          <div className="flex flex-wrap gap-2">
-                            {ex.flagBreakdown.map((fb, idx) => (
-                              <span
-                                key={idx}
-                                className="rounded border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] px-2 py-0.5 text-[11px]"
+                    <div className="space-y-4 min-w-0">
+                      {list.map((ex, i) => {
+                        const cmdKey = `${selectedTool.slug}-${commandTier}-${i}`;
+                        const showExplain = expandedExplains[cmdKey] ?? true;
+                        const showOut = Boolean(expandedOutputs[cmdKey]);
+                        const showHint = Boolean(expandedHints[cmdKey]);
+                        return (
+                          <div
+                            key={i}
+                            className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0A0D12] p-3.5 sm:p-4 space-y-3 min-w-0 max-w-full"
+                          >
+                            {/* Horizontally scrollable command block isolated from button grid */}
+                            <div className="w-full min-w-0 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-950 px-3 py-2.5">
+                              <pre className="w-full max-w-full overflow-x-auto whitespace-pre font-mono text-xs text-emerald-400 font-semibold leading-relaxed">
+                                $ {ex.command}
+                              </pre>
+                            </div>
+
+                            <p className="text-xs leading-relaxed text-slate-600 dark:text-slate-300 break-words">
+                              {ex.explanation}
+                            </p>
+
+                            {/* Responsive 2-column button grid on mobile, clean inline wrap on sm+ */}
+                            <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-stretch sm:items-center gap-2 w-full min-w-0 kali-keep-cols pt-0.5">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setExternalRun({ nonce: Date.now() + i, command: ex.command });
+                                  requestAnimationFrame(() => {
+                                    terminalSectionRef.current?.scrollIntoView({
+                                      behavior: 'smooth',
+                                      block: 'center',
+                                    });
+                                  });
+                                }}
+                                className={`${ex.sampleOutput ? 'col-span-2 sm:col-span-1 ' : ''}inline-flex w-full sm:w-auto min-w-0 items-center justify-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-2 text-xs font-semibold text-slate-950 hover:bg-emerald-400 transition-colors min-h-[38px] text-center leading-tight`}
                               >
-                                <strong className="font-mono text-cyan-500">{fb.flag}</strong>:{' '}
-                                {fb.meaning}
-                              </span>
-                            ))}
+                                <Play className="h-3.5 w-3.5 shrink-0" />
+                                <span>Run in Terminal</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                                    void navigator.clipboard.writeText(ex.command);
+                                  }
+                                  setCopiedCmdKey(cmdKey);
+                                  setTimeout(() => setCopiedCmdKey((c) => (c === cmdKey ? null : c)), 1400);
+                                }}
+                                className="inline-flex w-full sm:w-auto min-w-0 items-center justify-center gap-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-[#11161F] px-2.5 py-2 text-[11px] font-medium hover:border-emerald-500 transition-colors min-h-[38px] text-center leading-tight"
+                              >
+                                {copiedCmdKey === cmdKey ? (
+                                  <Check className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                                ) : (
+                                  <Copy className="h-3.5 w-3.5 shrink-0" />
+                                )}
+                                <span>{copiedCmdKey === cmdKey ? 'Copied' : 'Copy'}</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setExpandedExplains((p) => ({ ...p, [cmdKey]: !showExplain }))
+                                }
+                                className="inline-flex w-full sm:w-auto min-w-0 items-center justify-center gap-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-[#11161F] px-2.5 py-2 text-[11px] font-medium hover:border-cyan-500 transition-colors min-h-[38px] text-center leading-tight"
+                              >
+                                <Info className="h-3.5 w-3.5 shrink-0 text-cyan-500" />
+                                <span>Explain</span>
+                              </button>
+                              {ex.sampleOutput && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setExpandedOutputs((p) => ({ ...p, [cmdKey]: !showOut }))
+                                  }
+                                  className="inline-flex w-full sm:w-auto min-w-0 items-center justify-center gap-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-[#11161F] px-2.5 py-2 text-[11px] font-medium hover:border-violet-500 transition-colors min-h-[38px] text-center leading-tight"
+                                >
+                                  <Eye className="h-3.5 w-3.5 shrink-0 text-violet-500" />
+                                  <span>{showOut ? 'Hide Output' : 'Expected Output'}</span>
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setExpandedHints((p) => ({ ...p, [cmdKey]: !showHint }))
+                                }
+                                className="inline-flex w-full sm:w-auto min-w-0 items-center justify-center gap-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-[#11161F] px-2.5 py-2 text-[11px] font-medium hover:border-amber-500 transition-colors min-h-[38px] text-center leading-tight"
+                              >
+                                <HelpCircle className="h-3.5 w-3.5 shrink-0 text-amber-500" />
+                                <span>Hint</span>
+                              </button>
+                            </div>
+
+                            {showExplain && (
+                              <div className="flex flex-wrap gap-2 pt-0.5 min-w-0">
+                                {ex.flagBreakdown.map((fb, idx) => (
+                                  <span
+                                    key={idx}
+                                    className="max-w-full rounded border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] px-2.5 py-1 text-[11px] leading-snug break-words"
+                                  >
+                                    <strong className="font-mono text-cyan-600 dark:text-cyan-400">{fb.flag}</strong>:{' '}
+                                    {fb.meaning}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+
+                            {showOut && ex.sampleOutput && (
+                              <pre className="w-full max-w-full overflow-x-auto whitespace-pre rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-900 p-3 font-mono text-[11px] text-slate-200 leading-relaxed">
+                                {ex.sampleOutput}
+                              </pre>
+                            )}
+
+                            {showHint && (
+                              <div className="rounded-lg border border-amber-500/30 bg-amber-500/8 p-3 text-[11px] text-amber-700 dark:text-amber-300 leading-relaxed break-words">
+                                <strong>Beginner Hint:</strong> Make sure prerequisites are installed first (e.g. <code className="font-mono break-all">{selectedTool.installCommand}</code>). Click <strong>Run in Terminal</strong> above to test it immediately in the simulator!
+                              </div>
+                            )}
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   );
                 })()}
@@ -784,14 +1025,14 @@ export const LearnKaliHub: React.FC = () => {
 
               {/* Common Errors & Related Tools */}
               {selectedTool.commonErrorsJson.length > 0 && (
-                <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-5 space-y-3">
+                <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-4 sm:p-5 space-y-3 min-w-0">
                   <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
                     Common Errors &amp; Troubleshooting
                   </h3>
                   {selectedTool.commonErrorsJson.map((errItem, idx) => (
                     <div
                       key={idx}
-                      className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 text-xs space-y-1"
+                      className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 text-xs space-y-1 break-words"
                     >
                       <p className="font-semibold text-amber-600 dark:text-amber-300">
                         {errItem.error}
@@ -808,7 +1049,7 @@ export const LearnKaliHub: React.FC = () => {
               )}
 
               {selectedTool.relatedToolSlugsJson.length > 0 && (
-                <div className="flex flex-wrap items-center gap-2 text-xs">
+                <div className="flex flex-wrap items-center gap-2 text-xs min-w-0">
                   <span className="font-semibold text-slate-500">Related Tools:</span>
                   {selectedTool.relatedToolSlugsJson.map((rSlug) => (
                     <button
@@ -825,7 +1066,7 @@ export const LearnKaliHub: React.FC = () => {
             </div>
 
             {/* Right Guided Quiz + Interactive Simulated Practice */}
-            <div className="lg:col-span-5 space-y-5">
+            <div className="lg:col-span-5 space-y-5 min-w-0">
               {selectedToolLessons.map((lesson) => {
                 const done = toolProgressMap
                   .get(selectedTool.id)
@@ -833,7 +1074,7 @@ export const LearnKaliHub: React.FC = () => {
                 return (
                   <div
                     key={lesson.id}
-                    className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-5 space-y-3"
+                    className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-4 sm:p-5 space-y-3 min-w-0"
                   >
                     <div className="flex items-center justify-between gap-2 text-xs">
                       <span className="font-semibold text-cyan-600 dark:text-cyan-400">
@@ -893,18 +1134,25 @@ export const LearnKaliHub: React.FC = () => {
                 );
               })}
 
-              <LearnKaliTerminal
-                compact
-                title={`${selectedTool.name} — Safe Practice Terminal`}
-                suggestedCommands={
-                  selectedTool.basicCommandsJson.map((c) => c.command).slice(0, 3)
-                }
-                onCommandExecuted={(cmd, res) => {
-                  if (res.exitCode === 0) {
-                    void handleTerminalToolCheck(selectedTool.id, cmd);
-                  }
-                }}
-              />
+              <div ref={terminalSectionRef}>
+                <LearnKaliTerminal
+                  compact
+                  title={`${selectedTool.name} — Safe Practice Terminal`}
+                  externalRunTrigger={externalRun}
+                  runnerStatus={data?.runnerStatus || null}
+                  suggestedCommands={Array.from(
+                    new Set([
+                      ...selectedTool.basicCommandsJson.map((c) => c.command).slice(0, 3),
+                      ...(selectedTool.slug === 'whois' ? ['whois kali.org'] : []),
+                    ]),
+                  )}
+                  onCommandExecuted={(cmd, res) => {
+                    if (res.exitCode === 0) {
+                      void handleTerminalToolCheck(selectedTool.id, cmd);
+                    }
+                  }}
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -943,12 +1191,23 @@ export const LearnKaliHub: React.FC = () => {
               const mProg = missionProgressMap.get(mission.id);
               const isDone = mProg?.status === 'completed';
               const runList = missionCmdHistory[mission.id] || [];
+              const liveValidation = mission.terminalChallengeJson?.steps
+                ? validateMissionCommandSequence(
+                    runList,
+                    mission.terminalChallengeJson.steps,
+                    mProg?.stepsPassedJson ?? [],
+                  )
+                : { passedStepIds: [], missingSteps: [], lastError: null };
+              const passedStepsSet = new Set(liveValidation.passedStepIds);
+              const cardFeedback = missionFeedback[mission.id];
+              const isVerifying = verifyingMissionId === mission.id;
+
               return (
                 <div
                   key={mission.id}
-                  className="flex flex-col justify-between rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-5 space-y-4"
+                  className="flex flex-col justify-between rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-4 sm:p-5 space-y-4 min-w-0"
                 >
-                  <div className="space-y-2.5">
+                  <div className="space-y-2.5 min-w-0">
                     <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                       <span className="inline-flex items-center gap-1 rounded border border-violet-500/30 bg-violet-500/10 px-2 py-0.5 font-semibold uppercase text-violet-500">
                         <Flame className="h-3 w-3" />
@@ -982,36 +1241,61 @@ export const LearnKaliHub: React.FC = () => {
 
                     {mission.terminalChallengeJson && (
                       <div className="space-y-2 pt-1">
-                        <p className="text-[11px] font-semibold text-cyan-600 dark:text-cyan-400">
-                          Required Simulated Terminal Steps ({mission.terminalChallengeJson.steps.length})
-                        </p>
-                        {mission.terminalChallengeJson.steps.map((s) => (
-                          <div
-                            key={s.id}
-                            className="rounded border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0A0D12] p-2.5 text-[11px] space-y-1"
-                          >
-                            <p className="font-medium text-slate-800 dark:text-slate-200">
-                              {s.instruction}
-                            </p>
-                            <p className="font-mono text-slate-500">Hint: {s.hint}</p>
-                          </div>
-                        ))}
+                        <div className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                          <p className="font-semibold text-cyan-600 dark:text-cyan-400">
+                            Required Simulated Terminal Steps ({passedStepsSet.size}/
+                            {mission.terminalChallengeJson.steps.length} Verified)
+                          </p>
+                        </div>
+                        {mission.terminalChallengeJson.steps.map((s) => {
+                          const stepPassed = passedStepsSet.has(s.id);
+                          return (
+                            <div
+                              key={s.id}
+                              className={`rounded border p-2.5 text-[11px] space-y-1 ${
+                                stepPassed
+                                  ? 'border-emerald-500/40 bg-emerald-500/5'
+                                  : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0A0D12]'
+                              }`}
+                            >
+                              <div className="flex items-start justify-between gap-2 min-w-0">
+                                <p className="font-medium text-slate-800 dark:text-slate-200 min-w-0">
+                                  {s.instruction}
+                                </p>
+                                {stepPassed && (
+                                  <span className="inline-flex items-center gap-1 font-semibold text-emerald-500 shrink-0">
+                                    <CheckCircle2 className="h-3.5 w-3.5" /> Verified
+                                  </span>
+                                )}
+                              </div>
+                              <p className="font-mono text-slate-500 [overflow-wrap:anywhere]">Hint: {s.hint}</p>
+                            </div>
+                          );
+                        })}
                         <LearnKaliTerminal
                           compact
                           title={`Mission Terminal — ${mission.title}`}
+                          runnerStatus={data?.runnerStatus || null}
                           suggestedCommands={mission.terminalChallengeJson.steps.map((st) =>
-                            st.hint.replace(/^Run:\s*/i, ''),
+                            st.hint.replace(/^(?:Run|Try):\s*/i, ''),
                           )}
                           onCommandExecuted={(cmd) => {
                             setMissionCmdHistory((prev) => ({
                               ...prev,
                               [mission.id]: [...(prev[mission.id] || []), cmd],
                             }));
+                            setMissionFeedback((prev) => {
+                              if (!prev[mission.id] || prev[mission.id].ok) return prev;
+                              const next = { ...prev };
+                              delete next[mission.id];
+                              return next;
+                            });
                           }}
                         />
                         {runList.length > 0 && (
                           <p className="text-[11px] text-emerald-500">
-                            Recorded {runList.length} terminal command(s) for server validation.
+                            Recorded {runList.length} terminal command(s) —{' '}
+                            {passedStepsSet.size}/{mission.terminalChallengeJson.steps.length} required step(s) matched.
                           </p>
                         )}
                       </div>
@@ -1025,7 +1309,7 @@ export const LearnKaliHub: React.FC = () => {
                         {mission.assessmentJson.options.map((opt, idx) => (
                           <label
                             key={opt}
-                            className={`flex cursor-pointer items-center gap-2 rounded border px-2.5 py-1.5 text-xs ${
+                            className={`flex cursor-pointer items-center gap-2.5 rounded border px-3 py-2 text-xs min-h-[40px] ${
                               missionAnswers[mission.id] === idx
                                 ? 'border-emerald-500 bg-emerald-500/10'
                                 : 'border-slate-200 dark:border-slate-800'
@@ -1035,9 +1319,15 @@ export const LearnKaliHub: React.FC = () => {
                               type="radio"
                               name={`mission-${mission.id}`}
                               checked={missionAnswers[mission.id] === idx}
-                              onChange={() =>
-                                setMissionAnswers((p) => ({ ...p, [mission.id]: idx }))
-                              }
+                              onChange={() => {
+                                setMissionAnswers((p) => ({ ...p, [mission.id]: idx }));
+                                setMissionFeedback((prev) => {
+                                  if (!prev[mission.id] || prev[mission.id].ok) return prev;
+                                  const next = { ...prev };
+                                  delete next[mission.id];
+                                  return next;
+                                });
+                              }}
                             />
                             <span>{opt}</span>
                           </label>
@@ -1046,16 +1336,57 @@ export const LearnKaliHub: React.FC = () => {
                     )}
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => void handleCompleteMission(mission)}
-                    className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-emerald-500 px-3.5 py-2 text-xs font-semibold text-slate-950 hover:bg-emerald-400 transition-colors"
-                  >
-                    <ShieldCheck className="h-3.5 w-3.5" />
-                    {isDone
-                      ? 'Re-Verify Mission Solution'
-                      : `Verify & Complete Mission (+${mission.xpReward} XP)`}
-                  </button>
+                  <div className="space-y-2.5">
+                    {cardFeedback && (
+                      <div
+                        role={cardFeedback.ok ? 'status' : 'alert'}
+                        className={`rounded-lg border px-3 py-2.5 text-xs flex flex-wrap items-center justify-between gap-2 ${
+                          cardFeedback.ok
+                            ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300'
+                            : 'border-rose-500/40 bg-rose-500/10 text-rose-600 dark:text-rose-300'
+                        }`}
+                      >
+                        <div className="flex items-start gap-2 min-w-0 flex-1">
+                          {cardFeedback.ok ? (
+                            <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5" />
+                          ) : (
+                            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                          )}
+                          <span>{cardFeedback.message}</span>
+                        </div>
+                        {cardFeedback.needsSignIn && (
+                          <button
+                            type="button"
+                            onClick={() => void loginWithGoogle()}
+                            className="rounded-md bg-emerald-500 px-3 py-1.5 text-[11px] font-semibold text-slate-950 hover:bg-emerald-400 shrink-0"
+                          >
+                            Sign In with Google
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      disabled={isVerifying}
+                      onClick={() => void handleCompleteMission(mission)}
+                      className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-emerald-500 px-3.5 py-2.5 text-xs font-semibold text-slate-950 hover:bg-emerald-400 disabled:opacity-60 transition-colors min-h-[42px]"
+                    >
+                      {isVerifying ? (
+                        <>
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          Verifying Mission...
+                        </>
+                      ) : (
+                        <>
+                          <ShieldCheck className="h-3.5 w-3.5" />
+                          {isDone
+                            ? 'Re-Verify Mission Solution'
+                            : `Verify & Complete Mission (+${mission.xpReward} XP)`}
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
               );
             })}
@@ -1073,7 +1404,10 @@ export const LearnKaliHub: React.FC = () => {
             </span>
             <Sparkles className="h-4 w-4 text-cyan-500 shrink-0" />
           </div>
-          <LearnKaliTerminal />
+          <LearnKaliTerminal
+            runnerStatus={data?.runnerStatus || null}
+            externalRunTrigger={externalRun}
+          />
         </div>
       )}
 

@@ -449,7 +449,7 @@ export const GameLobbyView: React.FC<Props> = ({
                       value={inviteUsername}
                       onChange={(e) => setInviteUsername(e.target.value)}
                       placeholder="username or email..."
-                      className="flex-1 min-w-[200px] rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0A0D12] px-3 py-2 text-xs"
+                      className="w-full sm:flex-1 min-w-0 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0A0D12] px-3 py-2 text-xs"
                     />
                     <button
                       type="submit"

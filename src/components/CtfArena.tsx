@@ -12,6 +12,7 @@ import {
   Search,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { LoadErrorState, LoadingState } from './LoadingState';
 import { SafeRichText } from './SafeRichText';
 
 interface Challenge {
@@ -62,7 +63,8 @@ interface ExternalPlatform {
 const CTF_DIFFICULTIES = ['All', 'Beginner', 'Easy', 'Medium', 'Hard', 'Expert', 'Research Level'];
 
 export const CtfArena: React.FC = () => {
-  const { user, loginWithGoogle, apiFetch, refreshProfile } = useAuth();
+  const { user, learningExperience, toggleBookmark, hasBookmark, loginWithGoogle, apiFetch, refreshProfile } =
+    useAuth();
   const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [submissions, setSubmissions] = useState<SubmissionItem[]>([]);
   const [externalPlatforms, setExternalPlatforms] = useState<ExternalPlatform[]>([]);
@@ -80,20 +82,30 @@ export const CtfArena: React.FC = () => {
   const [reportReason, setReportReason] = useState('');
   const [feedback, setFeedback] = useState<Record<number, { ok: boolean; msg: string }>>({});
   const [submittingId, setSubmittingId] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadCtf = async () => {
-    const res = await apiFetch<{
-      challenges: Challenge[];
-      submissions: SubmissionItem[];
-      externalPlatforms?: ExternalPlatform[];
-    }>('/api/ctf');
-    setChallenges(res.challenges);
-    setSubmissions(res.submissions);
-    setExternalPlatforms(res.externalPlatforms || []);
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const res = await apiFetch<{
+        challenges: Challenge[];
+        submissions: SubmissionItem[];
+        externalPlatforms?: ExternalPlatform[];
+      }>('/api/ctf');
+      setChallenges(res.challenges);
+      setSubmissions(res.submissions);
+      setExternalPlatforms(res.externalPlatforms || []);
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : 'Unable to load CTF challenges.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
-    loadCtf();
+    void loadCtf();
   }, [user?.id]);
 
   const categories = useMemo(
@@ -159,13 +171,12 @@ export const CtfArena: React.FC = () => {
     }
   };
 
-  const handleToggleBookmark = async (chId: number) => {
-    if (!user) {
-      await loginWithGoogle();
-      return;
+  const handleToggleBookmark = async (ch: Challenge) => {
+    await toggleBookmark({ type: 'ctf', slug: ch.slug, title: ch.title });
+    if (user) {
+      await apiFetch(`/api/ctf/${ch.id}/bookmark`, { method: 'POST' });
+      await loadCtf();
     }
-    await apiFetch(`/api/ctf/${chId}/bookmark`, { method: 'POST' });
-    await loadCtf();
   };
 
   const handleReportChallenge = async (e: React.FormEvent, chId: number) => {
@@ -203,6 +214,12 @@ export const CtfArena: React.FC = () => {
           Solved: {solvedCount}/{challenges.length} · Showing {filtered.length}
         </div>
       </div>
+
+      {learningExperience === 'beginner' && (
+        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/8 px-4 py-3 text-xs text-slate-700 dark:text-slate-200">
+          <strong>How CTF Challenges Work:</strong> Read the puzzle description, download any attached artifact file, inspect hints if you get stuck, and paste the hidden flag (usually shaped like <code className="font-mono">KALI3977&#123;...&#125;</code>) into <strong>Verify Flag</strong> to earn points!
+        </div>
+      )}
 
       {/* Search, Difficulty, Status & Sort Controls */}
       <div className="grid gap-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-4 sm:grid-cols-2 lg:grid-cols-12">
@@ -263,13 +280,13 @@ export const CtfArena: React.FC = () => {
       </div>
 
       {/* Category Filter Strip */}
-      <div className="flex flex-wrap gap-1.5">
+      <div className="flex flex-wrap gap-1.5 min-w-0">
         {categories.map((cat) => (
           <button
             key={cat}
             type="button"
             onClick={() => setCategory(cat)}
-            className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
+            className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors max-w-full ${
               category === cat
                 ? 'bg-emerald-500 text-slate-950 font-semibold'
                 : 'border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] text-slate-600 dark:text-slate-300'
@@ -281,32 +298,44 @@ export const CtfArena: React.FC = () => {
       </div>
 
       {/* Challenges Grid */}
-      {filtered.length === 0 ? (
+      {loading && challenges.length === 0 ? (
+        <LoadingState
+          title="Loading CTF Arena Challenges..."
+          subtitle="Fetching dynamic challenge scoring, artifacts, and leaderboard state."
+          onRetry={() => void loadCtf()}
+        />
+      ) : loadError && challenges.length === 0 ? (
+        <LoadErrorState
+          title="Unable to load CTF Arena"
+          message={loadError}
+          onRetry={() => void loadCtf()}
+        />
+      ) : filtered.length === 0 ? (
         <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-8 text-center text-sm text-slate-500">
           No CTF challenges match your active search or filters.
         </div>
       ) : (
-        <div className="grid gap-5 lg:grid-cols-2">
+        <div className="grid gap-5 lg:grid-cols-2 min-w-0">
           {filtered.map((ch) => (
             <div
               key={ch.id}
-              className="flex flex-col justify-between rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-5 space-y-4"
+              className="flex flex-col justify-between rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-4 sm:p-5 space-y-4 min-w-0 max-w-full"
             >
-              <div className="space-y-3">
-                <div className="flex items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400">
-                  <span>
+              <div className="space-y-3 min-w-0">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400 min-w-0">
+                  <span className="break-words min-w-0">
                     {ch.category} · {ch.difficulty} · {ch.solveCount} solves
                   </span>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
                     <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
                       {ch.currentPoints} pts ({ch.scoringMode})
                     </span>
                     <button
                       type="button"
-                      onClick={() => handleToggleBookmark(ch.id)}
+                      onClick={() => void handleToggleBookmark(ch)}
                       aria-label={`Bookmark ${ch.title}`}
-                      className={`p-1 rounded transition-colors ${
-                        ch.bookmarked
+                      className={`p-1.5 rounded transition-colors ${
+                        ch.bookmarked || hasBookmark('ctf', ch.slug)
                           ? 'text-amber-500 bg-amber-500/10'
                           : 'text-slate-400 hover:text-amber-500'
                       }`}
@@ -317,15 +346,15 @@ export const CtfArena: React.FC = () => {
                       type="button"
                       onClick={() => setReportingId(reportingId === ch.id ? null : ch.id)}
                       aria-label={`Report issue with ${ch.title}`}
-                      className="p-1 text-slate-400 hover:text-rose-500"
+                      className="p-1.5 text-slate-400 hover:text-rose-500"
                     >
                       <AlertTriangle className="h-3.5 w-3.5" />
                     </button>
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between gap-2">
-                  <h2 className="font-display text-lg font-semibold text-slate-900 dark:text-slate-100">
+                <div className="flex flex-wrap items-center justify-between gap-2 min-w-0">
+                  <h2 className="font-display text-lg font-semibold text-slate-900 dark:text-slate-100 break-words min-w-0">
                     {ch.title}
                   </h2>
                   {ch.solved ? (
@@ -346,36 +375,36 @@ export const CtfArena: React.FC = () => {
                 {reportingId === ch.id && (
                   <form
                     onSubmit={(e) => handleReportChallenge(e, ch.id)}
-                    className="flex gap-2 rounded-lg border border-rose-500/30 bg-rose-500/5 p-2.5"
+                    className="flex flex-col sm:flex-row gap-2 rounded-lg border border-rose-500/30 bg-rose-500/5 p-2.5 min-w-0"
                   >
                     <input
                       type="text"
                       value={reportReason}
                       onChange={(e) => setReportReason(e.target.value)}
                       placeholder="Describe broken artifact or ambiguity..."
-                      className="min-w-0 flex-1 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#0A0D12] px-2.5 py-1 text-xs"
+                      className="min-w-0 flex-1 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#0A0D12] px-2.5 py-1.5 text-xs"
                       required
                     />
                     <button
                       type="submit"
-                      className="rounded bg-rose-500 px-3 py-1 text-xs font-semibold text-white"
+                      className="w-full sm:w-auto justify-center rounded bg-rose-500 px-3 py-1.5 text-xs font-semibold text-white"
                     >
                       Send Report
                     </button>
                   </form>
                 )}
 
-                <div className="flex flex-wrap items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3 min-w-0">
                   {ch.attachmentName && ch.unlocked && (
                     <a
                       href={`/api/ctf/${ch.id}/artifact`}
                       download={ch.attachmentName}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-1.5 font-mono text-xs font-medium text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/20 transition-colors"
+                      className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-1.5 font-mono text-xs font-medium text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/20 transition-colors break-all"
                     >
                       <Download className="h-3.5 w-3.5 shrink-0" />
-                      {ch.attachmentName}
+                      <span>{ch.attachmentName}</span>
                     </a>
                   )}
 
@@ -411,7 +440,7 @@ export const CtfArena: React.FC = () => {
                 )}
 
                 {openDetails[ch.id] && (
-                  <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0A0D12] p-3 text-xs space-y-2">
+                  <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0A0D12] p-3 text-xs space-y-2 min-w-0 break-words">
                     {ch.learningObjectives && ch.learningObjectives.length > 0 && (
                       <div>
                         <p className="font-semibold text-slate-600 dark:text-slate-300">Learning Objectives:</p>
@@ -422,23 +451,23 @@ export const CtfArena: React.FC = () => {
                         </ul>
                       </div>
                     )}
-                    <div className="flex flex-wrap gap-3 text-[11px] font-mono text-slate-500">
-                      {ch.flagFormat && <span>Format: {ch.flagFormat}</span>}
-                      {ch.relatedCourseSlug && <span>Course: {ch.relatedCourseSlug}</span>}
-                      {ch.relatedBookTitle && <span>Book: {ch.relatedBookTitle}</span>}
+                    <div className="flex flex-wrap gap-3 text-[11px] font-mono text-slate-500 break-words">
+                      {ch.flagFormat && <span className="[overflow-wrap:anywhere]">Format: {ch.flagFormat}</span>}
+                      {ch.relatedCourseSlug && <span className="[overflow-wrap:anywhere]">Course: {ch.relatedCourseSlug}</span>}
+                      {ch.relatedBookTitle && <span className="[overflow-wrap:anywhere]">Book: {ch.relatedBookTitle}</span>}
                     </div>
                     {ch.referenceUrl && ch.referenceUrl.startsWith('https://') && (
                       <a
                         href={ch.referenceUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-cyan-500 hover:underline"
+                        className="inline-flex max-w-full items-center gap-1 text-cyan-500 hover:underline break-all"
                       >
                         Official Technical Reference
-                        <ExternalLink className="h-3 w-3" />
+                        <ExternalLink className="h-3 w-3 shrink-0" />
                       </a>
                     )}
-                    <div className="border-t border-slate-200 dark:border-slate-800 pt-2 text-[11px] text-slate-500 space-y-0.5">
+                    <div className="border-t border-slate-200 dark:border-slate-800 pt-2 text-[11px] text-slate-500 space-y-0.5 break-words">
                       <p>
                         <strong>Provenance:</strong> {ch.provenanceAuthor || 'KALI3977 Security Engineering'} ·{' '}
                         <span className="font-mono">{ch.contentVersion || 'v1.0.0'}</span>
@@ -453,7 +482,7 @@ export const CtfArena: React.FC = () => {
                 )}
 
                 {ch.solved && ch.explanationAfterSolve && (
-                  <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-700 dark:text-emerald-300 space-y-1">
+                  <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-700 dark:text-emerald-300 space-y-1 min-w-0">
                     <strong>Post-Solve Takeaway:</strong>
                     <SafeRichText content={ch.explanationAfterSolve} className="space-y-1 text-xs" />
                   </div>
@@ -462,9 +491,9 @@ export const CtfArena: React.FC = () => {
 
               <form
                 onSubmit={(e) => handleSubmitFlag(e, ch.id)}
-                className="space-y-2 border-t border-slate-200 dark:border-slate-800 pt-4"
+                className="space-y-2 border-t border-slate-200 dark:border-slate-800 pt-4 min-w-0"
               >
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2 min-w-0">
                   <input
                     type="text"
                     disabled={!ch.unlocked || ch.solved}
@@ -472,14 +501,14 @@ export const CtfArena: React.FC = () => {
                     onChange={(e) => setFlagInputs((p) => ({ ...p, [ch.id]: e.target.value }))}
                     placeholder={ch.solved ? 'Flag already verified' : ch.flagFormat || 'KALI3977{...}'}
                     aria-label={`Submit flag for ${ch.title}`}
-                    className="min-w-0 flex-1 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0A0D12] px-3 py-2 font-mono text-xs text-slate-900 dark:text-slate-100 focus:border-emerald-500 focus:outline-none disabled:opacity-50"
+                    className="min-w-0 flex-1 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0A0D12] px-3 py-2 font-mono text-xs text-slate-900 dark:text-slate-100 focus:border-emerald-500 focus:outline-none disabled:opacity-50 min-h-[38px]"
                   />
                   <button
                     type="submit"
                     disabled={!ch.unlocked || ch.solved || submittingId === ch.id}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500 px-4 py-2 text-xs font-semibold text-slate-950 hover:bg-emerald-400 disabled:opacity-50 transition-colors whitespace-nowrap shrink-0"
+                    className="inline-flex w-full sm:w-auto items-center justify-center gap-1.5 rounded-lg bg-emerald-500 px-4 py-2 text-xs font-semibold text-slate-950 hover:bg-emerald-400 disabled:opacity-50 transition-colors min-h-[38px]"
                   >
-                    <Flag className="h-3.5 w-3.5" />
+                    <Flag className="h-3.5 w-3.5 shrink-0" />
                     {user ? 'Verify Flag' : 'Sign In'}
                   </button>
                 </div>

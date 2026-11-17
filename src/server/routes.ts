@@ -21,6 +21,9 @@ import {
   diagnosticAssessments,
   disciplinaryAppeals,
   ipViolationReports,
+  kaliMissions,
+  kaliTools,
+  kaliUserMissionProgress,
   labSessions,
   labs,
   lessons,
@@ -62,8 +65,20 @@ import {
 import {
   deriveSectionFlags,
   getSectionDefinition,
+  isSectionVisibleInStudentNav,
+  isStaffAdminRole,
   normalizeSectionDisplayStatus,
 } from '../lib/domain/sections.ts';
+import {
+  evaluateLearningProgression,
+  mergeLearningExperienceConfig,
+  normalizeAppearanceTheme,
+  normalizeLearningExperience,
+  normalizeProgressionMode,
+} from '../lib/domain/learning-experience.ts';
+import { normalizeLayoutPreference } from '../lib/domain/responsive-layout.ts';
+import { CYBER_GLOSSARY, HELP_ARTICLES } from '../lib/domain/help-docs.ts';
+import { SUPPORTED_SIMULATOR_COMMANDS } from '../lib/kali/simulator.ts';
 import {
   evaluateLabCompletionRequest,
   evaluateLabLaunchDecision,
@@ -130,6 +145,15 @@ async function getPlatformControls(): Promise<Record<string, unknown>> {
     .where(eq(platformSettings.key, 'platform_controls'))
     .limit(1);
   return (row?.valueJson as Record<string, unknown>) || {};
+}
+
+async function getLearningExperienceConfig() {
+  const [row] = await db
+    .select()
+    .from(platformSettings)
+    .where(eq(platformSettings.key, 'learning_experience_config'))
+    .limit(1);
+  return mergeLearningExperienceConfig((row?.valueJson as Record<string, unknown>) || null);
 }
 
 async function recordAuditLog(params: {
@@ -270,13 +294,29 @@ export function createApiRouter(): Router {
   // 1. AUTHENTICATION, PROFILE, CAMPUS VERIFICATION, MFA, SESSIONS
   // =========================================================================
   router.get('/auth/me', optionalAuth, async (req: AuthRequest, res) => {
+    const learningExperienceConfig = await getLearningExperienceConfig();
     if (!req.dbUser) {
-      return res.json({ authenticated: false, user: null, role: 'guest' });
+      return res.json({
+        authenticated: false,
+        user: null,
+        role: 'guest',
+        learningExperienceConfig,
+      });
     }
     const u = req.dbUser;
     const levelInfo = calculateLevelFromXp(u.xp);
 
-    const [sessions, logins, memberships, unreadNotifs, campusRow] = await Promise.all([
+    const [
+      sessions,
+      logins,
+      memberships,
+      unreadNotifs,
+      campusRow,
+      completedLessonsRow,
+      completedLabsRow,
+      solvedCtfsRow,
+      completedMissionsRow,
+    ] = await Promise.all([
       db
         .select({
           id: userSessions.id,
@@ -319,10 +359,65 @@ export function createApiRouter(): Router {
       u.campusId
         ? db.select({ name: campuses.name, code: campuses.code }).from(campuses).where(eq(campuses.id, u.campusId)).limit(1)
         : Promise.resolve([]),
+      db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(userLessonProgress)
+        .where(and(eq(userLessonProgress.userId, u.id), eq(userLessonProgress.completed, true))),
+      db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(labSessions)
+        .where(and(eq(labSessions.userId, u.id), eq(labSessions.status, 'completed'))),
+      db
+        .select({ count: sql<number>`count(distinct ${ctfSubmissions.challengeId})::int` })
+        .from(ctfSubmissions)
+        .where(and(eq(ctfSubmissions.userId, u.id), eq(ctfSubmissions.isCorrect, true))),
+      db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(kaliUserMissionProgress)
+        .where(and(eq(kaliUserMissionProgress.userId, u.id), eq(kaliUserMissionProgress.status, 'completed'))),
     ]);
+
+    const currentLearningExperience = normalizeLearningExperience(
+      u.learningExperience,
+      learningExperienceConfig.defaultLearningExperience,
+    );
+    const progressionMode = normalizeProgressionMode(u.progressionMode, 'automatic');
+    const dismissedUpgrade = u.dismissedThemeUpgrade
+      ? normalizeLearningExperience(u.dismissedThemeUpgrade)
+      : null;
+
+    const progressionEval = evaluateLearningProgression(
+      {
+        xp: u.xp,
+        completedLessonsCount: completedLessonsRow[0]?.count ?? 0,
+        completedLabsCount: completedLabsRow[0]?.count ?? 0,
+        solvedChallengesCount: solvedCtfsRow[0]?.count ?? 0,
+        completedMissionsCount: completedMissionsRow[0]?.count ?? 0,
+        currentExperience: currentLearningExperience,
+        progressionMode,
+        dismissedThemeUpgrade: dismissedUpgrade,
+      },
+      learningExperienceConfig,
+    );
+
+    const nextPendingUpgrade = progressionEval.recommendedUpgrade;
+    if ((u.pendingThemeUpgrade ?? null) !== (nextPendingUpgrade ?? null)) {
+      await db
+        .update(users)
+        .set({ pendingThemeUpgrade: nextPendingUpgrade, updatedAt: new Date() })
+        .where(eq(users.id, u.id));
+    }
 
     return res.json({
       authenticated: true,
+      learningExperienceConfig,
+      progressionSummary: {
+        ...progressionEval,
+        completedLessonsCount: completedLessonsRow[0]?.count ?? 0,
+        completedLabsCount: completedLabsRow[0]?.count ?? 0,
+        solvedChallengesCount: solvedCtfsRow[0]?.count ?? 0,
+        completedMissionsCount: completedMissionsRow[0]?.count ?? 0,
+      },
       user: {
         id: u.id,
         uid: u.uid,
@@ -347,6 +442,15 @@ export function createApiRouter(): Router {
         policyAcknowledgedAt: u.policyAcknowledgedAt ? u.policyAcknowledgedAt.toISOString() : null,
         profileVisibility: u.profileVisibility,
         preferredLang: u.preferredLang,
+        appearanceTheme: normalizeAppearanceTheme(u.appearanceTheme, 'dark'),
+        learningExperience: currentLearningExperience,
+        progressionMode,
+        layoutPreference: normalizeLayoutPreference(u.layoutPreference, 'automatic'),
+        onboardingCompleted: Boolean(u.onboardingCompleted),
+        onboardingGoal: u.onboardingGoal || '',
+        pendingThemeUpgrade: nextPendingUpgrade,
+        dismissedThemeUpgrade: dismissedUpgrade,
+        bookmarks: Array.isArray(u.bookmarksJson) ? u.bookmarksJson : [],
         notificationPrefs: u.notificationPrefsJson,
       },
       sessions,
@@ -382,6 +486,22 @@ export function createApiRouter(): Router {
     const country = sanitizeText(req.body.country ?? u.country, 60);
     const preferredLang = req.body.preferredLang === 'hi' ? 'hi' : 'en';
     const profileVisibility = req.body.profileVisibility === 'private' ? 'private' : 'public';
+    const appearanceTheme =
+      req.body.appearanceTheme !== undefined
+        ? normalizeAppearanceTheme(req.body.appearanceTheme, normalizeAppearanceTheme(u.appearanceTheme))
+        : normalizeAppearanceTheme(u.appearanceTheme);
+    const learningExperience =
+      req.body.learningExperience !== undefined
+        ? normalizeLearningExperience(req.body.learningExperience, normalizeLearningExperience(u.learningExperience))
+        : normalizeLearningExperience(u.learningExperience);
+    const progressionMode =
+      req.body.progressionMode !== undefined
+        ? normalizeProgressionMode(req.body.progressionMode, normalizeProgressionMode(u.progressionMode))
+        : normalizeProgressionMode(u.progressionMode);
+    const layoutPreference =
+      req.body.layoutPreference !== undefined
+        ? normalizeLayoutPreference(req.body.layoutPreference, normalizeLayoutPreference(u.layoutPreference))
+        : normalizeLayoutPreference(u.layoutPreference);
 
     const notifPrefs =
       req.body.notificationPrefs && typeof req.body.notificationPrefs === 'object'
@@ -402,6 +522,10 @@ export function createApiRouter(): Router {
         country: country || u.country,
         preferredLang,
         profileVisibility,
+        appearanceTheme,
+        learningExperience,
+        progressionMode,
+        layoutPreference,
         notificationPrefsJson: notifPrefs,
         updatedAt: new Date(),
       })
@@ -409,6 +533,269 @@ export function createApiRouter(): Router {
       .returning();
 
     res.json({ ok: true, user: updated });
+  });
+
+  // Update appearance theme, learning experience, progression mode, layout preference, onboarding, or auto-upgrade response
+  router.post('/profile/experience', requireAuth, async (req: AuthRequest, res) => {
+    const u = req.dbUser!;
+    const patch: Partial<typeof users.$inferInsert> = {
+      updatedAt: new Date(),
+    };
+
+    if (req.body.appearanceTheme !== undefined) {
+      patch.appearanceTheme = normalizeAppearanceTheme(req.body.appearanceTheme, normalizeAppearanceTheme(u.appearanceTheme));
+    }
+    if (req.body.learningExperience !== undefined) {
+      patch.learningExperience = normalizeLearningExperience(
+        req.body.learningExperience,
+        normalizeLearningExperience(u.learningExperience),
+      );
+      patch.pendingThemeUpgrade = null;
+    }
+    if (req.body.progressionMode !== undefined) {
+      patch.progressionMode = normalizeProgressionMode(req.body.progressionMode, normalizeProgressionMode(u.progressionMode));
+    }
+    if (req.body.layoutPreference !== undefined) {
+      patch.layoutPreference = normalizeLayoutPreference(
+        req.body.layoutPreference,
+        normalizeLayoutPreference(u.layoutPreference),
+      );
+    }
+    if (typeof req.body.onboardingCompleted === 'boolean') {
+      patch.onboardingCompleted = req.body.onboardingCompleted;
+    }
+    if (typeof req.body.onboardingGoal === 'string') {
+      patch.onboardingGoal = sanitizeText(req.body.onboardingGoal, 200);
+    }
+
+    if (req.body.upgradeDecision === 'accept' && u.pendingThemeUpgrade) {
+      patch.learningExperience = normalizeLearningExperience(u.pendingThemeUpgrade);
+      patch.pendingThemeUpgrade = null;
+      patch.dismissedThemeUpgrade = null;
+    } else if (req.body.upgradeDecision === 'decline' && u.pendingThemeUpgrade) {
+      patch.dismissedThemeUpgrade = u.pendingThemeUpgrade;
+      patch.pendingThemeUpgrade = null;
+    }
+
+    const [updated] = await db.update(users).set(patch).where(eq(users.id, u.id)).returning();
+    res.json({
+      ok: true,
+      appearanceTheme: updated.appearanceTheme,
+      learningExperience: updated.learningExperience,
+      progressionMode: updated.progressionMode,
+      layoutPreference: normalizeLayoutPreference(updated.layoutPreference, 'automatic'),
+      onboardingCompleted: updated.onboardingCompleted,
+      onboardingGoal: updated.onboardingGoal,
+      pendingThemeUpgrade: updated.pendingThemeUpgrade,
+      dismissedThemeUpgrade: updated.dismissedThemeUpgrade,
+    });
+  });
+
+  // Toggle bookmarks across courses, tools, labs, and CTF challenges
+  router.post('/profile/bookmarks/toggle', requireAuth, async (req: AuthRequest, res) => {
+    const u = req.dbUser!;
+    const rawType = String(req.body.type || '');
+    if (!['course', 'tool', 'lab', 'ctf'].includes(rawType)) {
+      return res.status(400).json({ error: 'Invalid bookmark type.' });
+    }
+    const type = rawType as 'course' | 'tool' | 'lab' | 'ctf';
+    const slug = sanitizeText(String(req.body.slug || ''), 120);
+    const title = sanitizeText(String(req.body.title || ''), 160);
+    if (!slug || !title) {
+      return res.status(400).json({ error: 'Bookmark slug and title are required.' });
+    }
+
+    const existing = Array.isArray(u.bookmarksJson) ? [...u.bookmarksJson] : [];
+    const idx = existing.findIndex((b) => b.type === type && b.slug === slug);
+    let bookmarked = false;
+    if (idx >= 0) {
+      existing.splice(idx, 1);
+      bookmarked = false;
+    } else {
+      existing.unshift({ type, slug, title, addedAt: new Date().toISOString() });
+      bookmarked = true;
+    }
+
+    await db
+      .update(users)
+      .set({ bookmarksJson: existing.slice(0, 100), updatedAt: new Date() })
+      .where(eq(users.id, u.id));
+
+    res.json({ ok: true, bookmarked, bookmarks: existing.slice(0, 100) });
+  });
+
+  // Searchable Help Docs, Glossary & Terminal Reference
+  router.get('/help', (_req, res) => {
+    res.json({
+      glossary: CYBER_GLOSSARY,
+      articles: HELP_ARTICLES,
+      terminalCommands: SUPPORTED_SIMULATOR_COMMANDS,
+    });
+  });
+
+  // Global Unified Platform Search (Courses, Kali Tools, Labs, CTFs, Books, Glossary, Help)
+  router.get('/search', optionalAuth, async (req: AuthRequest, res) => {
+    const q = sanitizeText(String(req.query.q || ''), 120).trim();
+    const isAdminViewer = isStaffAdminRole(req.dbUser?.role);
+    const sections = await getPlatformSections();
+    const isVisible = (key: string) => {
+      if (isAdminViewer) return true;
+      const found = sections.find((s) => s.sectionKey === key);
+      return isSectionVisibleInStudentNav(found);
+    };
+
+    if (!q) {
+      return res.json({
+        query: '',
+        results: {
+          courses: [],
+          tools: [],
+          labs: [],
+          challenges: [],
+          books: [],
+          glossary: CYBER_GLOSSARY.slice(0, 6),
+          helpArticles: HELP_ARTICLES,
+        },
+      });
+    }
+
+    const pattern = `%${q}%`;
+    const [courseRows, toolRows, labRows, ctfRows, bookRows] = await Promise.all([
+      isVisible('academy')
+        ? db
+            .select({
+              id: courses.id,
+              slug: courses.slug,
+              title: courses.titleEn,
+              stage: courses.stage,
+              stageTitle: courses.stageTitle,
+              summary: courses.summaryEn,
+            })
+            .from(courses)
+            .where(
+              and(
+                eq(courses.published, true),
+                or(
+                  ilike(courses.titleEn, pattern),
+                  ilike(courses.summaryEn, pattern),
+                  ilike(courses.stageTitle, pattern),
+                ),
+              ),
+            )
+            .limit(8)
+        : Promise.resolve([]),
+      isVisible('learn-kali')
+        ? db
+            .select({
+              id: kaliTools.id,
+              slug: kaliTools.slug,
+              name: kaliTools.name,
+              difficulty: kaliTools.difficulty,
+              summary: kaliTools.purpose,
+            })
+            .from(kaliTools)
+            .where(
+              and(
+                eq(kaliTools.published, true),
+                or(
+                  ilike(kaliTools.name, pattern),
+                  ilike(kaliTools.purpose, pattern),
+                  ilike(kaliTools.summary, pattern),
+                  ilike(kaliTools.installCommand, pattern),
+                ),
+              ),
+            )
+            .limit(10)
+        : Promise.resolve([]),
+      isVisible('labs')
+        ? db
+            .select({
+              id: labs.id,
+              slug: labs.slug,
+              title: labs.title,
+              category: labs.category,
+              difficulty: labs.difficulty,
+              summary: labs.description,
+            })
+            .from(labs)
+            .where(
+              and(
+                eq(labs.published, true),
+                eq(labs.enabled, true),
+                or(ilike(labs.title, pattern), ilike(labs.description, pattern), ilike(labs.category, pattern)),
+              ),
+            )
+            .limit(8)
+        : Promise.resolve([]),
+      isVisible('ctf')
+        ? db
+            .select({
+              id: ctfChallenges.id,
+              slug: ctfChallenges.slug,
+              title: ctfChallenges.title,
+              category: ctfChallenges.category,
+              difficulty: ctfChallenges.difficulty,
+              points: ctfChallenges.currentPoints,
+            })
+            .from(ctfChallenges)
+            .where(
+              and(
+                eq(ctfChallenges.published, true),
+                or(
+                  ilike(ctfChallenges.title, pattern),
+                  ilike(ctfChallenges.description, pattern),
+                  ilike(ctfChallenges.category, pattern),
+                ),
+              ),
+            )
+            .limit(8)
+        : Promise.resolve([]),
+      isVisible('books')
+        ? db
+            .select({
+              id: books.id,
+              slug: books.slug,
+              title: books.title,
+              author: books.author,
+              category: books.category,
+            })
+            .from(books)
+            .where(
+              and(
+                eq(books.status, 'published'),
+                or(ilike(books.title, pattern), ilike(books.author, pattern), ilike(books.category, pattern)),
+              ),
+            )
+            .limit(6)
+        : Promise.resolve([]),
+    ]);
+
+    const qLower = q.toLowerCase();
+    const glossaryMatches = CYBER_GLOSSARY.filter(
+      (g) =>
+        g.term.toLowerCase().includes(qLower) ||
+        g.shortMeaning.toLowerCase().includes(qLower) ||
+        g.category.toLowerCase().includes(qLower),
+    );
+    const helpMatches = HELP_ARTICLES.filter(
+      (a) =>
+        a.title.toLowerCase().includes(qLower) ||
+        a.summary.toLowerCase().includes(qLower) ||
+        a.steps.some((s) => s.toLowerCase().includes(qLower)),
+    );
+
+    res.json({
+      query: q,
+      results: {
+        courses: courseRows,
+        tools: toolRows,
+        labs: labRows,
+        challenges: ctfRows,
+        books: bookRows,
+        glossary: glossaryMatches,
+        helpArticles: helpMatches,
+      },
+    });
   });
 
   router.get('/campus/verify-requests', requireAuth, async (req: AuthRequest, res) => {
@@ -2670,6 +3057,15 @@ export function createApiRouter(): Router {
       .update(notifications)
       .set({ isRead: true })
       .where(and(eq(notifications.id, id), eq(notifications.userId, u.id)));
+    res.json({ ok: true });
+  });
+
+  router.post('/notifications/read-all', requireAuth, async (req: AuthRequest, res) => {
+    const u = req.dbUser!;
+    await db
+      .update(notifications)
+      .set({ isRead: true })
+      .where(and(eq(notifications.userId, u.id), eq(notifications.isRead, false)));
     res.json({ ok: true });
   });
 
@@ -5160,6 +5556,57 @@ export function createApiRouter(): Router {
       });
 
       res.json({ session: updated });
+    },
+  );
+
+  // Admin Learning Experience & Automatic Progression Config
+  router.get(
+    '/admin/learning-experience',
+    requireAuth,
+    requirePermission('admin:platform_settings'),
+    async (_req, res) => {
+      const config = await getLearningExperienceConfig();
+      res.json({ config });
+    },
+  );
+
+  router.post(
+    '/admin/learning-experience',
+    requireAuth,
+    requirePermission('admin:platform_settings'),
+    async (req: AuthRequest, res) => {
+      const actor = req.dbUser!;
+      const previous = await getLearningExperienceConfig();
+      const nextConfig = mergeLearningExperienceConfig(req.body || {});
+      await db
+        .insert(platformSettings)
+        .values({
+          key: 'learning_experience_config',
+          valueJson: nextConfig as unknown as Record<string, unknown>,
+          updatedById: actor.id,
+          updatedAt: new Date(),
+        })
+        .onConflictDoUpdate({
+          target: platformSettings.key,
+          set: {
+            valueJson: nextConfig as unknown as Record<string, unknown>,
+            updatedById: actor.id,
+            updatedAt: new Date(),
+          },
+        });
+
+      await recordAuditLog({
+        actorId: actor.id,
+        actorEmail: actor.email,
+        action: 'LEARNING_EXPERIENCE_CONFIG_UPDATED',
+        resourceType: 'platform_settings',
+        resourceId: 'learning_experience_config',
+        previousStateJson: previous as unknown as Record<string, unknown>,
+        newStateJson: nextConfig as unknown as Record<string, unknown>,
+        ipAddress: req.ip,
+      });
+
+      res.json({ ok: true, config: nextConfig });
     },
   );
 

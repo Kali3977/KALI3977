@@ -830,7 +830,7 @@ export const MultiplayerArena: React.FC = () => {
                           </div>
                           <p className="mt-0.5 text-slate-700 dark:text-slate-300 break-words">{m.content}</p>
                         </div>
-                        <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center gap-1 shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                           <button
                             type="button"
                             onClick={() => setReplyToMsg(m)}
@@ -887,7 +887,7 @@ export const MultiplayerArena: React.FC = () => {
                       type="button"
                       onClick={() => setReplyToMsg(null)}
                       aria-label="Cancel reply"
-                      className="text-slate-400 hover:text-slate-200"
+                      className="text-slate-500 hover:text-slate-900 dark:hover:text-slate-200"
                     >
                       <X className="h-3.5 w-3.5" />
                     </button>

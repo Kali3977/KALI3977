@@ -474,11 +474,96 @@ const KALI_TOOLS_SEED: ToolSeedItem[] = [
     interactiveSupported: false,
   },
   {
+    slug: 'linux-cli',
+    categorySlug: 'system-services',
+    name: 'Linux CLI Foundations (ls, cd, cat, grep, find)',
+    summary: 'Essential Linux file navigation, permission inspection, and log searching before running offensive security tools.',
+    purpose: 'Master terminal navigation, file reading, pattern searching with grep, and SUID auditing with find in a safe Kali shell.',
+    installCommand: 'sudo apt update && sudo apt install -y coreutils grep findutils',
+    supportedOs: 'Kali Linux, Debian, Ubuntu, all UNIX-like OS',
+    versionNote: 'GNU Coreutils',
+    difficulty: 'Beginner',
+    minLevelNumber: 1,
+    xpReward: 60,
+    status: 'active',
+    prerequisitesJson: ['None — designed for complete beginners'],
+    basicCommandsJson: [
+      {
+        command: 'pwd && ls -la',
+        explanation: 'Prints your current directory path and lists every file including permissions and hidden files.',
+        flagBreakdown: [
+          { flag: 'pwd', meaning: 'Print Working Directory (where you are right now)' },
+          { flag: 'ls -la', meaning: 'List all files (-a) in detailed long permission format (-l)' },
+        ],
+        sampleOutput: '/home/kali\ndrwxr-xr-x 1 kali kali  4096 Nov 15 12:00 ./\n-rw-r--r-- 1 kali kali   420 Nov 15 12:00 README.txt\ndrwxr-xr-x 1 kali kali  4096 Nov 15 12:00 evidence/',
+      },
+      {
+        command: 'grep "Accepted" /home/kali/evidence/auth.log',
+        explanation: 'Searches authentication logs for successful SSH logins.',
+        flagBreakdown: [
+          { flag: '"Accepted"', meaning: 'Text pattern to search inside the file' },
+          { flag: '/home/kali/evidence/auth.log', meaning: 'Target log file path' },
+        ],
+        sampleOutput: 'Nov 15 04:12:19 lab01 sshd[4188]: Accepted password for opsadmin from 203.0.113.77 port 49122 ssh2',
+      },
+    ],
+    intermediateCommandsJson: [
+      {
+        command: 'mkdir recon_notes && touch recon_notes/target.txt && ls -la recon_notes',
+        explanation: 'Creates a dedicated workspace folder and empty note file in one chained line.',
+        flagBreakdown: [
+          { flag: 'mkdir', meaning: 'Create new directory' },
+          { flag: '&&', meaning: 'Run next command only if the previous command succeeded' },
+          { flag: 'touch', meaning: 'Create an empty file' },
+        ],
+        sampleOutput: '-rw-r--r-- 1 kali kali     0 Nov 15 12:00 target.txt',
+      },
+    ],
+    advancedCommandsJson: [
+      {
+        command: 'find / -perm -4000 2>/dev/null',
+        explanation: 'Discovers binaries configured with the SUID bit (run with owner privileges) while silencing permission-denied noise.',
+        flagBreakdown: [
+          { flag: '-perm -4000', meaning: 'Match POSIX SUID bit' },
+          { flag: '2>/dev/null', meaning: 'Redirect permission error messages to null' },
+        ],
+        sampleOutput: '/usr/bin/sudo\n/usr/bin/passwd\n/usr/local/bin/lab-backup-helper',
+      },
+    ],
+    commonErrorsJson: [
+      {
+        error: 'cat: auth.log: No such file or directory',
+        cause: 'You are in /home/kali while the file lives inside /home/kali/evidence/.',
+        fix: 'Run `cd evidence && cat auth.log` or provide the full path `cat /home/kali/evidence/auth.log`.',
+      },
+    ],
+    relatedToolSlugsJson: ['whois', 'nmap', 'tmux'],
+    officialDocsUrl: 'https://www.kali.org/docs/introduction/kali-linux-overview/',
+    githubUrl: null,
+    interactiveSupported: true,
+    lessons: [
+      {
+        slug: 'linux-cli-navigation-and-logs',
+        title: 'First Steps in Kali Linux Shell Navigation',
+        stepOrder: 1,
+        contentMarkdown:
+          'Every cybersecurity analyst starts in the Linux shell. `pwd` confirms where you are, `ls -la` reveals files and POSIX permissions, `cat` reads files, and `grep` extracts signal from large logs.',
+        commandPractice: 'grep "Accepted" /home/kali/evidence/auth.log',
+        expectedGoal: 'Run `grep "Accepted" /home/kali/evidence/auth.log` or `ls -la` in the sandbox terminal.',
+        quizQuestion: 'Which Linux command searches inside text files or logs for lines matching a pattern?',
+        quizOptionsJson: ['pwd', 'grep', 'chmod', 'mkdir'],
+        quizCorrectIndex: 1,
+        quizExplanation: '`grep` filters file lines or piped output matching a given pattern.',
+        xpReward: 50,
+      },
+    ],
+  },
+  {
     slug: 'whois',
     categorySlug: 'information-gathering',
     name: 'WHOIS CLI',
     summary: 'Registration metadata lookup client for domains, IP blocks, and ASNs.',
-    purpose: 'Identify registrar ownership, abuse contacts, and network block assignments.',
+    purpose: 'Identify registrar ownership, abuse contacts, domain lifecycle dates, and authoritative name servers during passive reconnaissance.',
     installCommand: 'sudo apt update && sudo apt install -y whois',
     supportedOs: 'Kali Linux, Linux, macOS',
     versionNote: 'Standard Debian/Kali',
@@ -489,18 +574,74 @@ const KALI_TOOLS_SEED: ToolSeedItem[] = [
     prerequisitesJson: ['Domain & IP concepts'],
     basicCommandsJson: [
       {
+        command: 'sudo apt update && sudo apt install -y whois',
+        explanation: 'Updates the Kali APT package index as root (`sudo`) and installs the `whois` client non-interactively (`-y`).',
+        flagBreakdown: [
+          { flag: 'sudo', meaning: 'Run command with temporary administrator (root) privileges' },
+          { flag: 'apt update', meaning: 'Download fresh package index metadata from repositories' },
+          { flag: '&&', meaning: 'Run install only if update succeeded' },
+          { flag: 'apt install -y whois', meaning: 'Install the whois package automatically answering Yes (-y)' },
+        ],
+        sampleOutput: '[sudo] simulated privilege elevation active\nHit:1 http://http.kali.org/kali kali-rolling InRelease\nSetting up whois ... Done.',
+      },
+      {
         command: 'whois kali.org',
-        explanation: 'Retrieves registrar, nameserver, and domain registration dates.',
-        flagBreakdown: [{ flag: 'kali.org', meaning: 'Domain or IPv4 address to query' }],
+        explanation: 'Retrieves registrar, nameserver, DNSSEC, and domain registration dates from curated educational WHOIS records.',
+        flagBreakdown: [{ flag: 'kali.org', meaning: 'Domain name to query' }],
+        sampleOutput: 'Domain Name: KALI.ORG\nRegistrar: Gandi SAS / Public Registry Reference\nName Server: ns1.kali.org\nName Server: ns2.kali.org\nDNSSEC: signedDelegation',
       },
     ],
-    intermediateCommandsJson: [],
-    advancedCommandsJson: [],
-    commonErrorsJson: [],
-    relatedToolSlugsJson: ['amass', 'theharvester'],
+    intermediateCommandsJson: [
+      {
+        command: 'whois app.lab.local',
+        explanation: 'Queries synthetic lab domain metadata inside KALI3977 training scope.',
+        flagBreakdown: [{ flag: 'app.lab.local', meaning: 'Synthetic KALI3977 practice domain' }],
+        sampleOutput: 'Domain Name: APP.LAB.LOCAL\nRegistrar: KALI3977 Synthetic Internal Registry',
+      },
+    ],
+    advancedCommandsJson: [
+      {
+        command: 'whois kali.org | grep "Name Server"',
+        explanation: 'Pipes WHOIS output directly into grep to isolate only authoritative nameserver lines.',
+        flagBreakdown: [
+          { flag: '|', meaning: 'Pipe stdout from whois into grep' },
+          { flag: 'grep "Name Server"', meaning: 'Show only matching Name Server rows' },
+        ],
+        sampleOutput: 'Name Server: ns1.kali.org\nName Server: ns2.kali.org',
+      },
+    ],
+    commonErrorsJson: [
+      {
+        error: "zsh: command not found: whois",
+        cause: 'Minimal Kali container images sometimes omit optional CLI recon utilities.',
+        fix: 'Install it cleanly with `sudo apt update && sudo apt install -y whois` and re-run `whois kali.org`.',
+      },
+    ],
+    relatedToolSlugsJson: ['linux-cli', 'amass', 'theharvester'],
     officialDocsUrl: 'https://www.kali.org/tools/whois/',
     githubUrl: null,
     interactiveSupported: true,
+    lessons: [
+      {
+        slug: 'whois-package-install-and-lookup',
+        title: 'Installing Packages with APT & Inspecting WHOIS Ownership',
+        stepOrder: 1,
+        contentMarkdown:
+          'When setting up a fresh Kali toolkit, you first run `sudo apt update` to refresh package metadata and `sudo apt install -y <package>` to install the utility. Then run `whois kali.org` to inspect registrar ownership, expiry dates, and authoritative name servers without touching target web ports.',
+        commandPractice: 'whois kali.org',
+        expectedGoal: 'Run `sudo apt update && sudo apt install -y whois` followed by `whois kali.org` in the terminal.',
+        quizQuestion: 'Why do Kali users commonly run `sudo apt update` right before `sudo apt install -y whois`?',
+        quizOptionsJson: [
+          'To delete old log files automatically',
+          'To refresh repository package index lists with root permission before installing',
+          'To scan open TCP ports on the domain',
+          'To bypass DNSSEC checks',
+        ],
+        quizCorrectIndex: 1,
+        quizExplanation: '`sudo` elevates privileges and `apt update` ensures APT fetches the latest package versions before installation.',
+        xpReward: 50,
+      },
+    ],
   },
   {
     slug: 'nikto',
@@ -1923,6 +2064,20 @@ export async function syncLearnKaliSeed(): Promise<void> {
       toolId = inserted.id;
     } else {
       toolId = existing.id;
+      if (toolItem.slug === 'whois' && existing.commonErrorsJson.length === 0) {
+        await db
+          .update(kaliTools)
+          .set({
+            purpose: toolItem.purpose,
+            basicCommandsJson: toolItem.basicCommandsJson,
+            intermediateCommandsJson: toolItem.intermediateCommandsJson,
+            advancedCommandsJson: toolItem.advancedCommandsJson,
+            commonErrorsJson: toolItem.commonErrorsJson,
+            relatedToolSlugsJson: toolItem.relatedToolSlugsJson,
+            updatedAt: new Date(),
+          })
+          .where(eq(kaliTools.id, existing.id));
+      }
     }
 
     if (toolItem.lessons) {

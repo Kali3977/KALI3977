@@ -366,12 +366,12 @@ export const GamePlayStage: React.FC<Props> = ({
             return (
               <div
                 key={q.id}
-                className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-5 space-y-3"
+                className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-4 sm:p-5 space-y-3 min-w-0"
               >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <Terminal className="h-4 w-4 text-emerald-500" />
-                    <h3 className="font-display text-sm font-semibold">
+                <div className="flex flex-wrap items-center justify-between gap-2 min-w-0">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Terminal className="h-4 w-4 text-emerald-500 shrink-0" />
+                    <h3 className="font-display text-sm font-semibold break-words min-w-0">
                       Round {idx + 1}: {q.title}
                     </h3>
                   </div>
@@ -380,8 +380,8 @@ export const GamePlayStage: React.FC<Props> = ({
                   </span>
                 </div>
 
-                <p className="text-xs text-slate-600 dark:text-slate-300">{q.prompt}</p>
-                <pre className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-950 p-3 font-mono text-xs text-emerald-400">
+                <p className="text-xs text-slate-600 dark:text-slate-300 break-words">{q.prompt}</p>
+                <pre className="w-full max-w-full overflow-x-auto whitespace-pre rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-950 p-3 font-mono text-xs text-emerald-400">
                   {q.artifact}
                 </pre>
 
@@ -405,7 +405,7 @@ export const GamePlayStage: React.FC<Props> = ({
                       onChange={(e) => setAnswerById((prev) => ({ ...prev, [q.id]: e.target.value }))}
                       placeholder="Enter flag, command, or exact remediation..."
                       aria-label={`Answer for ${q.title}`}
-                      className="flex-1 min-w-[200px] rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0A0D12] px-3 py-2 font-mono text-xs"
+                      className="w-full sm:flex-1 min-w-0 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0A0D12] px-3 py-2 font-mono text-xs"
                     />
                     <button
                       type="button"
@@ -484,16 +484,16 @@ export const GamePlayStage: React.FC<Props> = ({
           {(caseInfo.exhibits || []).map((ex) => (
             <div
               key={ex.id}
-              className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-4 space-y-2"
+              className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-4 space-y-2 min-w-0"
             >
-              <div className="flex items-center justify-between gap-2">
-                <span className="inline-flex items-center gap-1.5 text-xs font-semibold">
-                  <Search className="h-3.5 w-3.5 text-cyan-500" />
-                  {ex.label}
+              <div className="flex flex-wrap items-center justify-between gap-2 min-w-0">
+                <span className="inline-flex items-center gap-1.5 text-xs font-semibold min-w-0">
+                  <Search className="h-3.5 w-3.5 text-cyan-500 shrink-0" />
+                  <span className="break-words">{ex.label}</span>
                 </span>
                 <span className="font-mono text-[11px] text-slate-500">{ex.source}</span>
               </div>
-              <pre className="overflow-x-auto rounded-lg bg-slate-950 p-3 font-mono text-[11px] text-slate-200 whitespace-pre-wrap">
+              <pre className="w-full max-w-full overflow-x-auto whitespace-pre rounded-lg bg-slate-950 p-3 font-mono text-[11px] text-slate-200">
                 {ex.content}
               </pre>
               {ex.locked && !completed && (
@@ -763,23 +763,23 @@ export const GamePlayStage: React.FC<Props> = ({
                 : 'border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-[#11161F]/50 opacity-65'
           }`}
         >
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 min-w-0">
+            <div className="flex items-center gap-2 min-w-0">
               {lock.status === 'unlocked' ? (
-                <Unlock className="h-4 w-4 text-emerald-500" />
+                <Unlock className="h-4 w-4 text-emerald-500 shrink-0" />
               ) : (
-                <Lock className="h-4 w-4 text-cyan-500" />
+                <Lock className="h-4 w-4 text-cyan-500 shrink-0" />
               )}
-              <h3 className="font-display text-sm font-semibold">{lock.title}</h3>
+              <h3 className="font-display text-sm font-semibold break-words min-w-0">{lock.title}</h3>
             </div>
             <span className="font-mono text-xs text-slate-400">
               {lock.cipherType} · {lock.points} pts · {lock.status.toUpperCase()}
             </span>
           </div>
 
-          <p className="text-xs text-slate-600 dark:text-slate-300">{lock.prompt}</p>
+          <p className="text-xs text-slate-600 dark:text-slate-300 break-words">{lock.prompt}</p>
           {lock.artifact && (
-            <pre className="rounded-lg bg-slate-950 p-3 font-mono text-xs text-cyan-400 overflow-x-auto">
+            <pre className="w-full max-w-full overflow-x-auto whitespace-pre rounded-lg bg-slate-950 p-3 font-mono text-xs text-cyan-400">
               {lock.artifact}
             </pre>
           )}
@@ -799,7 +799,7 @@ export const GamePlayStage: React.FC<Props> = ({
                 }
                 placeholder="Enter decrypted lock keycode..."
                 aria-label={`Lock ${lock.lockNumber} keycode`}
-                className="flex-1 min-w-[200px] rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0A0D12] px-3 py-2 font-mono text-xs"
+                className="w-full sm:flex-1 min-w-0 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0A0D12] px-3 py-2 font-mono text-xs"
               />
               <button
                 type="button"

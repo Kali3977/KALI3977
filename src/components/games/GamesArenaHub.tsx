@@ -25,6 +25,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { LoadErrorState, LoadingState } from '../LoadingState';
 import { GameLobbyView } from './GameLobbyView';
 import type {
   GameCategoryItem,
@@ -454,9 +455,9 @@ export const GamesArenaHub: React.FC = () => {
   return (
     <div className="space-y-8">
       {/* Arena Hero & Player Progression Header */}
-      <section className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-6 space-y-5">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="space-y-1.5 max-w-2xl">
+      <section className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-4 sm:p-6 space-y-5 min-w-0">
+        <div className="flex flex-wrap items-start justify-between gap-4 min-w-0">
+          <div className="space-y-1.5 max-w-2xl min-w-0">
             <p className="font-mono text-xs uppercase tracking-wide text-emerald-500">
               KALI3977 Games Arena · 6 Categories · 30 Interactive Cyber Games
             </p>
@@ -468,13 +469,13 @@ export const GamesArenaHub: React.FC = () => {
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto min-w-0">
             <button
               type="button"
               onClick={() => void loadAll()}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 px-3.5 py-2 text-xs font-medium hover:bg-slate-100 dark:hover:bg-slate-800 whitespace-nowrap shrink-0"
+              className="inline-flex w-full sm:w-auto items-center justify-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 px-3.5 py-2 text-xs font-medium hover:bg-slate-100 dark:hover:bg-slate-800 min-h-[38px]"
             >
-              <RefreshCw className="h-3.5 w-3.5" />
+              <RefreshCw className="h-3.5 w-3.5 shrink-0" />
               Refresh Arena
             </button>
             {!user && (
@@ -482,7 +483,7 @@ export const GamesArenaHub: React.FC = () => {
                 type="button"
                 disabled={authPending}
                 onClick={() => void loginWithGoogle()}
-                className="rounded-lg bg-emerald-500 px-4 py-2 text-xs font-semibold text-slate-950 hover:bg-emerald-400 disabled:opacity-60 whitespace-nowrap shrink-0"
+                className="w-full sm:w-auto rounded-lg bg-emerald-500 px-4 py-2 text-xs font-semibold text-slate-950 hover:bg-emerald-400 disabled:opacity-60 min-h-[38px] text-center"
               >
                 Sign In to Play &amp; Save XP
               </button>
@@ -617,9 +618,17 @@ export const GamesArenaHub: React.FC = () => {
       </div>
 
       {loading && !catalog ? (
-        <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-8 text-sm text-slate-500">
-          Loading 6 categories and 30 cybersecurity games...
-        </div>
+        <LoadingState
+          title="Loading 6 Categories & 30 Cybersecurity Games..."
+          subtitle="Syncing live lobbies, matchmaking queues, and seasonal leaderboards."
+          onRetry={() => void loadAll()}
+        />
+      ) : error && !catalog ? (
+        <LoadErrorState
+          title="Unable to load Games Arena"
+          message={error}
+          onRetry={() => void loadAll()}
+        />
       ) : null}
 
       {/* TAB 1: ARENA & ALL 30 GAMES */}
@@ -688,7 +697,7 @@ export const GamesArenaHub: React.FC = () => {
 
           {/* Filter Toolbar */}
           <section className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-4 flex flex-wrap items-center gap-3">
-            <div className="relative flex-1 min-w-[220px]">
+            <div className="relative w-full sm:w-auto sm:flex-1 min-w-0">
               <Search className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
@@ -704,7 +713,7 @@ export const GamesArenaHub: React.FC = () => {
               aria-label="Filter by difficulty"
               value={difficultyFilter}
               onChange={(e) => setDifficultyFilter(e.target.value)}
-              className="rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0A0D12] px-3 py-2 text-xs"
+              className="w-full sm:w-auto max-w-full min-w-0 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0A0D12] px-3 py-2 text-xs"
             >
               <option value="All">All Difficulties</option>
               <option value="Beginner">Beginner</option>
@@ -718,7 +727,7 @@ export const GamesArenaHub: React.FC = () => {
               aria-label="Filter by mode"
               value={modeFilter}
               onChange={(e) => setModeFilter(e.target.value)}
-              className="rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0A0D12] px-3 py-2 text-xs"
+              className="w-full sm:w-auto max-w-full min-w-0 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0A0D12] px-3 py-2 text-xs"
             >
               <option value="All">All Game Modes</option>
               <option value="solo">Solo Practice</option>
@@ -733,7 +742,7 @@ export const GamesArenaHub: React.FC = () => {
             <button
               type="button"
               onClick={() => setExpandedCatIds(catalog.categories.map((c) => c.id))}
-              className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-xs font-medium hover:bg-slate-100 dark:hover:bg-slate-800 whitespace-nowrap shrink-0"
+              className="w-full sm:w-auto rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-xs font-medium hover:bg-slate-100 dark:hover:bg-slate-800 text-center"
             >
               Expand All 6 Categories
             </button>
@@ -747,15 +756,15 @@ export const GamesArenaHub: React.FC = () => {
               return (
                 <div
                   key={cat.id}
-                  className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] overflow-hidden"
+                  className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] overflow-hidden min-w-0"
                 >
                   <button
                     type="button"
                     onClick={() => toggleCategory(cat.id)}
-                    className="w-full flex items-center justify-between gap-4 px-5 py-4 text-left hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors"
+                    className="w-full flex items-center justify-between gap-4 px-4 sm:px-5 py-4 text-left hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors"
                   >
                     <div className="space-y-0.5 min-w-0">
-                      <div className="flex items-center gap-2.5">
+                      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
                         <span className="font-mono text-xs font-bold text-emerald-500">
                           Category {cat.code}
                         </span>
@@ -776,17 +785,17 @@ export const GamesArenaHub: React.FC = () => {
                   </button>
 
                   {isOpen && (
-                    <div className="border-t border-slate-200 dark:border-slate-800 p-5 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    <div className="border-t border-slate-200 dark:border-slate-800 p-4 sm:p-5 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                       {gamesInCat.length === 0 ? (
                         <p className="text-xs text-slate-500">No games in this category match the active filter.</p>
                       ) : (
                         gamesInCat.map((g) => (
                           <div
                             key={g.id}
-                            className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0A0D12] p-4 flex flex-col justify-between gap-3"
+                            className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0A0D12] p-4 flex flex-col justify-between gap-3 min-w-0"
                           >
-                            <div className="space-y-1.5">
-                              <div className="flex items-center justify-between gap-2 text-[11px] font-mono text-slate-500">
+                            <div className="space-y-1.5 min-w-0">
+                              <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono text-slate-500">
                                 <span className="text-cyan-500">{g.difficulty}</span>
                                 <span>
                                   {g.minPlayers}–{g.maxPlayers} Players · {Math.round(g.durationSeconds / 60)}m
@@ -798,12 +807,12 @@ export const GamesArenaHub: React.FC = () => {
                               <p className="text-xs text-slate-600 dark:text-slate-400 line-clamp-2">
                                 {g.tagline}
                               </p>
-                              <p className="font-mono text-[11px] text-slate-500">
+                              <p className="font-mono text-[11px] text-slate-500 break-words">
                                 Modes: {g.supportedModesJson.join(' · ').replace(/_/g, ' ')}
                               </p>
                             </div>
 
-                            <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-200 dark:border-slate-800/80">
+                            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-200 dark:border-slate-800/80">
                               <button
                                 type="button"
                                 disabled={!g.isEnabled}
@@ -816,14 +825,14 @@ export const GamesArenaHub: React.FC = () => {
                                     autoStart: true,
                                   })
                                 }
-                                className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-slate-950 hover:bg-emerald-400 disabled:opacity-50 whitespace-nowrap shrink-0"
+                                className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-slate-950 hover:bg-emerald-400 disabled:opacity-50"
                               >
                                 {g.isEnabled ? 'Play Solo' : 'Disabled'}
                               </button>
                               <button
                                 type="button"
                                 onClick={() => void openGameDetail(g.slug)}
-                                className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs font-medium hover:bg-slate-100 dark:hover:bg-slate-800 whitespace-nowrap shrink-0"
+                                className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs font-medium hover:bg-slate-100 dark:hover:bg-slate-800"
                               >
                                 Details &amp; Multiplayer
                               </button>
@@ -964,7 +973,7 @@ export const GamesArenaHub: React.FC = () => {
                   className={`rounded-lg px-3 py-1.5 text-xs font-medium whitespace-nowrap shrink-0 ${
                     lbTab === key
                       ? 'bg-emerald-500 text-slate-950 font-semibold'
-                      : 'border border-slate-200 dark:border-slate-800 text-slate-500 hover:text-slate-200'
+                      : 'border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100'
                   }`}
                 >
                   {label}
@@ -981,7 +990,7 @@ export const GamesArenaHub: React.FC = () => {
                 onChange={(e) => setFriendUsername(e.target.value)}
                 placeholder="Add friend by exact username..."
                 aria-label="Friend username"
-                className="min-w-[220px] rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0A0D12] px-3 py-2 text-xs"
+                className="w-full sm:w-auto sm:flex-1 min-w-0 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0A0D12] px-3 py-2 text-xs"
               />
               <button
                 type="submit"

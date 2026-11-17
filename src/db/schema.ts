@@ -54,6 +54,18 @@ export const users = pgTable(
     suspensionReason: text('suspension_reason'),
     profileVisibility: text('profile_visibility').notNull().default('public'),
     preferredLang: text('preferred_lang').notNull().default('en'),
+    appearanceTheme: text('appearance_theme').notNull().default('dark'),
+    learningExperience: text('learning_experience').notNull().default('beginner'),
+    progressionMode: text('progression_mode').notNull().default('automatic'),
+    layoutPreference: text('layout_preference').notNull().default('automatic'),
+    onboardingCompleted: boolean('onboarding_completed').notNull().default(false),
+    onboardingGoal: text('onboarding_goal').notNull().default(''),
+    pendingThemeUpgrade: text('pending_theme_upgrade'),
+    dismissedThemeUpgrade: text('dismissed_theme_upgrade'),
+    bookmarksJson: jsonb('bookmarks_json')
+      .$type<Array<{ type: 'course' | 'tool' | 'lab' | 'ctf'; slug: string; title: string; addedAt: string }>>()
+      .notNull()
+      .default([]),
     policyAcknowledgedAt: timestamp('policy_acknowledged_at'),
     notificationPrefsJson: jsonb('notification_prefs_json')
       .$type<{

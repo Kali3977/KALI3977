@@ -8,12 +8,18 @@ import {
   Power,
   RefreshCw,
   Shield,
+  Sliders,
   Wrench,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSections } from '../context/SectionContext';
 import { ConfirmDialog } from './ConfirmDialog';
-import type { PlatformSectionState, SectionDisplayStatus } from '../types/kali';
+import type {
+  LearningExperience,
+  LearningExperienceConfig,
+  PlatformSectionState,
+  SectionDisplayStatus,
+} from '../types/kali';
 
 interface SectionAuditEntry {
   id: number;
@@ -25,15 +31,28 @@ interface SectionAuditEntry {
   createdAt: string;
 }
 
+const DEFAULT_LE_CONFIG: LearningExperienceConfig = {
+  defaultLearningExperience: 'beginner',
+  autoProgressionEnabled: true,
+  beginnerMaxXp: 999,
+  intermediateMaxXp: 4999,
+  minLessonsForIntermediate: 3,
+  minPracticeForIntermediate: 3,
+  minLessonsForExpert: 8,
+  minPracticeForExpert: 10,
+};
+
 export const SectionManagementAdminPanel: React.FC<{
   onSectionsChanged?: () => Promise<void>;
 }> = ({ onSectionsChanged }) => {
-  const { user, apiFetch } = useAuth();
+  const { user, apiFetch, refreshProfile } = useAuth();
   const { previewAsStudent, setPreviewAsStudent, refreshSections } = useSections();
 
   const [sections, setSections] = useState<PlatformSectionState[]>([]);
   const [auditLogs, setAuditLogs] = useState<SectionAuditEntry[]>([]);
   const [statusDrafts, setStatusDrafts] = useState<Record<string, { displayStatus: SectionDisplayStatus; statusMessage: string }>>({});
+  const [leConfig, setLeConfig] = useState<LearningExperienceConfig>(DEFAULT_LE_CONFIG);
+  const [savingLeConfig, setSavingLeConfig] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -46,11 +65,15 @@ export const SectionManagementAdminPanel: React.FC<{
     setLoading(true);
     setError(null);
     try {
-      const res = await apiFetch<{ sections: PlatformSectionState[]; auditLogs: SectionAuditEntry[] }>(
-        '/api/admin/sections',
-      );
+      const [res, leRes] = await Promise.all([
+        apiFetch<{ sections: PlatformSectionState[]; auditLogs: SectionAuditEntry[] }>('/api/admin/sections'),
+        apiFetch<{ config: LearningExperienceConfig }>('/api/admin/learning-experience').catch(() => null),
+      ]);
       setSections(res.sections);
       setAuditLogs(res.auditLogs || []);
+      if (leRes?.config) {
+        setLeConfig(leRes.config);
+      }
       const drafts: Record<string, { displayStatus: SectionDisplayStatus; statusMessage: string }> = {};
       for (const s of res.sections) {
         drafts[s.sectionKey] = {
@@ -69,6 +92,29 @@ export const SectionManagementAdminPanel: React.FC<{
   useEffect(() => {
     void loadData();
   }, []);
+
+  const handleSaveLearningConfig = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingLeConfig(true);
+    setMessage(null);
+    setError(null);
+    try {
+      const res = await apiFetch<{ ok: boolean; config: LearningExperienceConfig }>(
+        '/api/admin/learning-experience',
+        {
+          method: 'POST',
+          body: JSON.stringify(leConfig),
+        },
+      );
+      setLeConfig(res.config);
+      await refreshProfile();
+      setMessage('Saved Learning Experience defaults & automatic progression thresholds.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save learning experience config.');
+    } finally {
+      setSavingLeConfig(false);
+    }
+  };
 
   const syncAfterChange = async () => {
     await Promise.all([loadData(), refreshSections(), onSectionsChanged ? onSectionsChanged() : Promise.resolve()]);
@@ -360,6 +406,182 @@ export const SectionManagementAdminPanel: React.FC<{
           ))}
         </div>
       </div>
+
+      {/* Learning Experience & Auto-Progression Thresholds */}
+      <form
+        onSubmit={handleSaveLearningConfig}
+        className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-5 space-y-4"
+      >
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <Sliders className="h-4 w-4 text-cyan-500" />
+              <h3 className="font-display text-base font-semibold text-slate-900 dark:text-slate-100">
+                Learning Experience &amp; Auto-Progression Thresholds
+              </h3>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Configure the default Learning Experience theme for new users and XP + practical completion cutoffs used when Automatic Progression recommends an upgrade (never alters permissions or locks content).
+            </p>
+          </div>
+          {isOwner && (
+            <button
+              type="submit"
+              disabled={savingLeConfig}
+              className="rounded-lg bg-emerald-500 px-4 py-2 text-xs font-semibold text-slate-950 hover:bg-emerald-400 disabled:opacity-50 whitespace-nowrap shrink-0"
+            >
+              {savingLeConfig ? 'Saving...' : 'Save Experience Config'}
+            </button>
+          )}
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 text-xs">
+          <label className="space-y-1">
+            <span className="block font-medium text-slate-700 dark:text-slate-300">
+              Default Learning Experience
+            </span>
+            <select
+              aria-label="Default Learning Experience"
+              disabled={!isOwner || savingLeConfig}
+              value={leConfig.defaultLearningExperience}
+              onChange={(e) =>
+                setLeConfig((prev) => ({
+                  ...prev,
+                  defaultLearningExperience: e.target.value as LearningExperience,
+                }))
+              }
+              className="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0A0D12] px-3 py-2"
+            >
+              <option value="beginner">Beginner (Guided Explanations)</option>
+              <option value="intermediate">Intermediate (Balanced Guidance)</option>
+              <option value="expert">Expert (Compact Precision)</option>
+            </select>
+          </label>
+
+          <label className="space-y-1">
+            <span className="block font-medium text-slate-700 dark:text-slate-300">
+              Auto-Progression Prompts
+            </span>
+            <select
+              aria-label="Auto-Progression Prompts"
+              disabled={!isOwner || savingLeConfig}
+              value={leConfig.autoProgressionEnabled ? 'enabled' : 'disabled'}
+              onChange={(e) =>
+                setLeConfig((prev) => ({
+                  ...prev,
+                  autoProgressionEnabled: e.target.value === 'enabled',
+                }))
+              }
+              className="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0A0D12] px-3 py-2"
+            >
+              <option value="enabled">Enabled (Notify &amp; Offer Upgrade)</option>
+              <option value="disabled">Disabled (Manual Switching Only)</option>
+            </select>
+          </label>
+
+          <label className="space-y-1">
+            <span className="block font-medium text-slate-700 dark:text-slate-300">
+              Beginner Max XP Cutoff
+            </span>
+            <input
+              type="number"
+              min={100}
+              disabled={!isOwner || savingLeConfig}
+              value={leConfig.beginnerMaxXp}
+              onChange={(e) =>
+                setLeConfig((prev) => ({ ...prev, beginnerMaxXp: Number(e.target.value) || 0 }))
+              }
+              className="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0A0D12] px-3 py-2 font-mono tabular-nums"
+            />
+          </label>
+
+          <label className="space-y-1">
+            <span className="block font-medium text-slate-700 dark:text-slate-300">
+              Intermediate Max XP Cutoff
+            </span>
+            <input
+              type="number"
+              min={500}
+              disabled={!isOwner || savingLeConfig}
+              value={leConfig.intermediateMaxXp}
+              onChange={(e) =>
+                setLeConfig((prev) => ({ ...prev, intermediateMaxXp: Number(e.target.value) || 0 }))
+              }
+              className="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0A0D12] px-3 py-2 font-mono tabular-nums"
+            />
+          </label>
+
+          <label className="space-y-1">
+            <span className="block font-medium text-slate-700 dark:text-slate-300">
+              Min Lessons (Intermediate)
+            </span>
+            <input
+              type="number"
+              min={0}
+              disabled={!isOwner || savingLeConfig}
+              value={leConfig.minLessonsForIntermediate}
+              onChange={(e) =>
+                setLeConfig((prev) => ({
+                  ...prev,
+                  minLessonsForIntermediate: Number(e.target.value) || 0,
+                }))
+              }
+              className="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0A0D12] px-3 py-2 font-mono tabular-nums"
+            />
+          </label>
+
+          <label className="space-y-1">
+            <span className="block font-medium text-slate-700 dark:text-slate-300">
+              Min Practice / Labs (Intermediate)
+            </span>
+            <input
+              type="number"
+              min={0}
+              disabled={!isOwner || savingLeConfig}
+              value={leConfig.minPracticeForIntermediate}
+              onChange={(e) =>
+                setLeConfig((prev) => ({
+                  ...prev,
+                  minPracticeForIntermediate: Number(e.target.value) || 0,
+                }))
+              }
+              className="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0A0D12] px-3 py-2 font-mono tabular-nums"
+            />
+          </label>
+
+          <label className="space-y-1">
+            <span className="block font-medium text-slate-700 dark:text-slate-300">
+              Min Lessons (Expert)
+            </span>
+            <input
+              type="number"
+              min={0}
+              disabled={!isOwner || savingLeConfig}
+              value={leConfig.minLessonsForExpert}
+              onChange={(e) =>
+                setLeConfig((prev) => ({ ...prev, minLessonsForExpert: Number(e.target.value) || 0 }))
+              }
+              className="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0A0D12] px-3 py-2 font-mono tabular-nums"
+            />
+          </label>
+
+          <label className="space-y-1">
+            <span className="block font-medium text-slate-700 dark:text-slate-300">
+              Min Practice / Labs (Expert)
+            </span>
+            <input
+              type="number"
+              min={0}
+              disabled={!isOwner || savingLeConfig}
+              value={leConfig.minPracticeForExpert}
+              onChange={(e) =>
+                setLeConfig((prev) => ({ ...prev, minPracticeForExpert: Number(e.target.value) || 0 }))
+              }
+              className="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0A0D12] px-3 py-2 font-mono tabular-nums"
+            />
+          </label>
+        </div>
+      </form>
 
       {/* Section Change Audit History */}
       <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#11161F] p-5 space-y-3">
